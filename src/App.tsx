@@ -3,7 +3,7 @@ import LogPanel from '@/components/organisms/LogPanel';
 import RulesPanel from '@/components/organisms/RulesPanel';
 import TableBoard from '@/components/organisms/TableBoard';
 import GameSectionGrid from '@/components/templates/GameSectionGrid';
-import { HUMAN, RULE, useGame } from '@/hooks/useGame';
+import { HUMAN, useGame } from '@/hooks/useGame';
 
 export default function App() {
   const {
@@ -13,6 +13,9 @@ export default function App() {
     winTarget,
     canStart,
     canDiscard,
+    rules,
+    selectedRuleIndex,
+    setSelectedRuleIndex,
     startGame,
     discard,
   } = useGame();
@@ -26,6 +29,9 @@ export default function App() {
         canStart={canStart}
         wallCount={state.wall.length}
         onStart={startGame}
+        rules={rules}
+        selectedRuleIndex={selectedRuleIndex}
+        onSelectRule={setSelectedRuleIndex}
       />
 
       <GameSectionGrid>
@@ -37,7 +43,11 @@ export default function App() {
           evaluation={evaluation}
           winTarget={winTarget}
         />
-        <RulesPanel rule={RULE} evaluation={evaluation} />
+        <RulesPanel
+          rule={state.rule}
+          ruleName={state.ruleName}
+          evaluation={evaluation}
+        />
         <LogPanel log={state.log} />
       </GameSectionGrid>
 

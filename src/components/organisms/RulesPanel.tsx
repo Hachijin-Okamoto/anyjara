@@ -2,10 +2,15 @@ import { type RuleConfig, type YakuEvaluation } from '@/hooks/useGame';
 
 type RulesPanelProps = {
   rule: RuleConfig;
+  ruleName: string;
   evaluation: YakuEvaluation;
 };
 
-export default function RulesPanel({ rule, evaluation }: RulesPanelProps) {
+export default function RulesPanel({
+  rule,
+  ruleName,
+  evaluation,
+}: RulesPanelProps) {
   return (
     <section
       style={{
@@ -16,6 +21,9 @@ export default function RulesPanel({ rule, evaluation }: RulesPanelProps) {
       }}
     >
       <h2 style={{ margin: '0 0 10px 0' }}>Rules</h2>
+      <div style={{ marginBottom: 10, color: '#555' }}>
+        適用ルール: <b>{ruleName}</b>
+      </div>
       <div style={{ marginBottom: 10, color: '#555' }}>
         初期手札: {rule.handSize} / 勝利手札:{' '}
         {rule.winHandSize ?? rule.handSize + 1}

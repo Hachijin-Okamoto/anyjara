@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 
 import { type Tile } from '@/entity/Tile';
 import rawRuleConfig from '../../rule.json';
@@ -33,6 +33,16 @@ export type RuleConfig = {
   };
 };
 
+type RuleDefinitionRaw = {
+  ruleName: string;
+  body: Partial<RuleConfig>;
+};
+
+export type RuleDefinition = {
+  ruleName: string;
+  rule: RuleConfig;
+};
+
 export type YakuResult = {
   id: string;
   name: string;
@@ -50,14 +60,16 @@ export type GameState = {
   wall: Tile[];
   hands: Record<PlayerId, Tile[]>;
   discards: Record<PlayerId, Tile[]>;
-  lastDrawn: Record<PlayerId, string | null>;
+  lastTsumo: Record<PlayerId, string | null>;
   turn: PlayerId;
   phase: Phase;
   log: string[];
+  ruleName: string;
+  rule: RuleConfig;
 };
 
 type Action =
-  | { type: 'START_GAME' }
+  | { type: 'START_GAME'; rule: RuleDefinition }
   | { type: 'DRAW' }
   | { type: 'DISCARD'; tileId: string };
 
@@ -83,8 +95,7 @@ const DEFAULT_RULE: RuleConfig = {
   win: { minPoints: 3 },
 };
 
-export const RULE: RuleConfig = (() => {
-  const raw = rawRuleConfig as Partial<RuleConfig>;
+function normalizeRule(raw: Partial<RuleConfig>): RuleConfig {
   const colors =
     raw.colors && raw.colors.length > 0 ? raw.colors : DEFAULT_RULE.colors;
   const handSize = raw.handSize ?? DEFAULT_RULE.handSize;
@@ -98,19 +109,66 @@ export const RULE: RuleConfig = (() => {
     yaku,
     win: { minPoints },
   };
-})();
+}
+
+function toRuleDefinitions(raw: unknown): RuleDefinition[] {
+  const source = raw as {
+    rules?: RuleDefinitionRaw[];
+    ruleName?: string;
+    body?: Partial<RuleConfig>;
+  };
+
+  const rawRules: Array<RuleDefinitionRaw | Partial<RuleConfig>> = [];
+  if (Array.isArray(raw)) {
+    rawRules.push(...(raw as RuleDefinitionRaw[]));
+  } else if (Array.isArray(source?.rules)) {
+    rawRules.push(...source.rules);
+  } else if (source?.body) {
+    rawRules.push({
+      ruleName: source.ruleName ?? 'Default',
+      body: source.body,
+    });
+  } else if (raw && typeof raw === 'object') {
+    rawRules.push(raw as Partial<RuleConfig>);
+  }
+
+  const normalized = rawRules.map((rule, index) => {
+    if ('body' in rule) {
+      return {
+        ruleName: rule.ruleName || `Rule ${index + 1}`,
+        rule: normalizeRule(rule.body ?? {}),
+      };
+    }
+    return {
+      ruleName: `Rule ${index + 1}`,
+      rule: normalizeRule(rule),
+    };
+  });
+
+  if (normalized.length === 0) {
+    return [{ ruleName: 'Default', rule: normalizeRule(DEFAULT_RULE) }];
+  }
+
+  return normalized;
+}
+
+export const RULES: RuleDefinition[] = toRuleDefinitions(rawRuleConfig);
 
 const PLAYER_IDS: PlayerId[] = [0, 1, 2, 3];
 export const HUMAN: PlayerId = 0;
+
+const DEFAULT_RULE_DEF = RULES[0];
 
 const INITIAL: GameState = {
   wall: [],
   hands: { 0: [], 1: [], 2: [], 3: [] },
   discards: { 0: [], 1: [], 2: [], 3: [] },
-  lastDrawn: { 0: null, 1: null, 2: null, 3: null },
+  lastTsumo: { 0: null, 1: null, 2: null, 3: null },
   turn: 0,
   phase: 'idle',
   log: ['「Start Game」で開始'],
+  ruleName: DEFAULT_RULE_DEF.ruleName,
+  rule: DEFAULT_RULE_DEF.rule,
 };
 
 function makeWall(rule: RuleConfig): Tile[] {
@@ -208,10 +266,11 @@ function nextPlayer(turn: PlayerId): PlayerId {
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'START_GAME': {
-      const wall = shuffle(makeWall(RULE));
+      const { rule, ruleName } = action.rule;
+      const wall = shuffle(makeWall(rule));
       let w = wall;
       const hands: Record<PlayerId, Tile[]> = { 0: [], 1: [], 2: [], 3: [] };
-      for (let i = 0; i < RULE.handSize; i++) {
+      for (let i = 0; i < rule.handSize; i++) {
         for (const p of PLAYER_IDS) {
           const d = drawOne(w);
           if (d.tile) hands[p].push(d.tile);
@@ -228,10 +287,12 @@ function reducer(state: GameState, action: Action): GameState {
           3: sortHand(hands[3]),
         },
         discards: { 0: [], 1: [], 2: [], 3: [] },
-        lastDrawn: { 0: null, 1: null, 2: null, 3: null },
+        lastTsumo: { 0: null, 1: null, 2: null, 3: null },
         turn: 0,
         phase: 'draw',
         log: ['ゲーム開始。P0（あなた）から。自動で1枚引きます。'],
+        ruleName,
+        rule,
       };
     }
 
@@ -249,7 +310,7 @@ function reducer(state: GameState, action: Action): GameState {
 
       const p = state.turn;
       const newHand = sortHand([...state.hands[p], tile]);
-      const winCheck = canWin(newHand, RULE);
+      const winCheck = canWin(newHand, state.rule);
       if (winCheck.achieved) {
         const yakuNames = winCheck.results
           .filter((r) => r.achieved)
@@ -259,7 +320,7 @@ function reducer(state: GameState, action: Action): GameState {
           ...state,
           wall,
           hands: { ...state.hands, [p]: newHand },
-          lastDrawn: { ...state.lastDrawn, [p]: tile.id },
+          lastTsumo: { ...state.lastTsumo, [p]: tile.id },
           phase: 'end',
           log: [
             ...state.log,
@@ -274,7 +335,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         wall,
         hands: { ...state.hands, [p]: newHand },
-        lastDrawn: { ...state.lastDrawn, [p]: tile.id },
+        lastTsumo: { ...state.lastTsumo, [p]: tile.id },
         phase: 'discard',
         log: [
           ...state.log,
@@ -299,7 +360,7 @@ function reducer(state: GameState, action: Action): GameState {
         ...state,
         hands: { ...state.hands, [p]: sortHand(newHand) },
         discards: { ...state.discards, [p]: [...state.discards[p], tile] },
-        lastDrawn: { ...state.lastDrawn, [p]: null },
+        lastTsumo: { ...state.lastTsumo, [p]: null },
         turn: next,
         phase: 'draw',
         log: [...state.log, `P${p} が ${tile.label} を捨てた。P${next} の番。`],
@@ -313,15 +374,17 @@ function reducer(state: GameState, action: Action): GameState {
 
 export function useGame() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
+  const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
+  const selectedRule = RULES[selectedRuleIndex] ?? RULES[0];
 
   const canStart = state.phase === 'idle' || state.phase === 'end';
   const canDiscard = state.phase === 'discard' && state.turn === HUMAN;
 
   const evaluation = useMemo(
-    () => evaluateYaku(state.hands[HUMAN], RULE),
-    [state.hands],
+    () => evaluateYaku(state.hands[HUMAN], state.rule),
+    [state.hands, state.rule],
   );
-  const winTarget = RULE.win.minPoints;
+  const winTarget = state.rule.win.minPoints;
 
   const statusText = useMemo(() => {
     if (state.phase === 'idle') return 'Start Game で開始';
@@ -353,7 +416,7 @@ export function useGame() {
     return undefined;
   }, [state.phase, state.turn, state.hands]);
 
-  const startGame = () => dispatch({ type: 'START_GAME' });
+  const startGame = () => dispatch({ type: 'START_GAME', rule: selectedRule });
   const discard = (tileId: string) => dispatch({ type: 'DISCARD', tileId });
 
   return {
@@ -363,6 +426,9 @@ export function useGame() {
     winTarget,
     canStart,
     canDiscard,
+    rules: RULES,
+    selectedRuleIndex,
+    setSelectedRuleIndex,
     startGame,
     discard,
   };

@@ -1,3 +1,6 @@
+import { useState } from 'react';
+
+import ActionButton from '@/components/atoms/ActionButton';
 import TileButton from '@/components/atoms/TileButton';
 import PlayerArea from '@/components/molecules/PlayerArea';
 import TableCenter from '@/components/molecules/TableCenter';
@@ -21,15 +24,16 @@ export default function TableBoard({
   humanId,
   canDiscard,
   onDiscard,
-  evaluation,
-  winTarget,
 }: TableBoardProps) {
-  const lastDrawnId = state.lastDrawn[humanId];
+  const [showOpponentHands, setShowOpponentHands] = useState(false);
+  const lastTsumoId = state.lastTsumo[humanId];
   const hand = state.hands[humanId];
-  const drawnTile = lastDrawnId
-    ? hand.find((t) => t.id === lastDrawnId)
+  const drawnTile = lastTsumoId
+    ? hand.find((t) => t.id === lastTsumoId)
     : undefined;
-  const baseHand = drawnTile ? hand.filter((t) => t.id !== lastDrawnId) : hand;
+  const _baseHand = drawnTile ? hand.filter((t) => t.id !== lastTsumoId) : hand;
+  console.log(_baseHand);
+  const scores = { 0: 0, 1: 0, 2: 0, 3: 0 } as const;
 
   return (
     <section
@@ -38,14 +42,33 @@ export default function TableBoard({
         borderRadius: 16,
         padding: 14,
         background: 'white',
+        maxWidth: 1200,
+        margin: '0 auto',
       }}
     >
-      <h2 style={{ margin: '0 0 10px 0' }}>Table</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 10,
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Table</h2>
+        <ActionButton onClick={() => setShowOpponentHands((prev) => !prev)}>
+          {showOpponentHands
+            ? '他プレイヤー手牌を非表示'
+            : '他プレイヤー手牌を表示'}
+        </ActionButton>
+      </div>
 
       <div
         style={{
           position: 'relative',
-          height: 520,
+          height: 640,
+          width: 'min(96vw, 1200px)',
+          margin: '0 auto',
           borderRadius: 18,
           background:
             'radial-gradient(circle at center, #f8f8f8 0%, #f2f2f2 65%, #ededed 100%)',
@@ -63,10 +86,11 @@ export default function TableBoard({
         />
 
         <PlayerArea
-          label={`P2 手札: ${state.hands[2].length} 枚`}
+          label="P2"
+          handTiles={state.hands[2]}
           discards={state.discards[2]}
-          maxTiles={8}
-          direction="row"
+          direction="down"
+          showHandFaces={showOpponentHands}
           style={{
             position: 'absolute',
             top: 16,
@@ -75,31 +99,50 @@ export default function TableBoard({
           }}
         />
 
-        <PlayerArea
-          label={`P3 手札: ${state.hands[3].length} 枚`}
-          discards={state.discards[3]}
-          maxTiles={6}
-          direction="column"
+        <div
           style={{
             position: 'absolute',
             right: 16,
             top: '50%',
             transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
           }}
-        />
+        >
+          <PlayerArea
+            label="P3"
+            handTiles={state.hands[3]}
+            discards={state.discards[3]}
+            direction="left"
+          />
+        </div>
 
-        <PlayerArea
-          label={`P1 手札: ${state.hands[1].length} 枚`}
-          discards={state.discards[1]}
-          maxTiles={6}
-          direction="column"
+        <div
           style={{
             position: 'absolute',
             left: 16,
             top: '50%',
             transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
           }}
-        />
+        >
+          <PlayerArea
+            label="P1 手牌"
+            handTiles={state.hands[1]}
+            direction="right"
+            showHandFaces={showOpponentHands}
+            tilesRotationDeg={90}
+          />
+          <PlayerArea
+            label="P1 捨て牌"
+            discards={state.discards[1]}
+            direction="right"
+            tilesRotationDeg={90}
+          />
+        </div>
 
         <div
           style={{
@@ -110,15 +153,11 @@ export default function TableBoard({
           }}
         >
           <PlayerArea
-            label={`P0 捨て牌: ${state.discards[humanId].length} 枚`}
-            discards={state.discards[humanId]}
-            maxTiles={8}
-            direction="row"
-            style={{ marginBottom: 10 }}
+            label="P0（あなた）"
+            handTiles={state.hands[0]}
+            discards={state.discards[0]}
+            direction="up"
           />
-          <div style={{ color: '#555', textAlign: 'center', marginBottom: 6 }}>
-            P0（あなた）
-          </div>
           <div
             style={{
               display: 'flex',
@@ -136,33 +175,25 @@ export default function TableBoard({
                 justifyContent: 'center',
                 flex: 1,
               }}
-            >
-              {baseHand.map((t) => (
-                <TileButton
-                  key={t.id}
-                  tile={t}
-                  disabled={!canDiscard}
-                  onClick={() => onDiscard(t.id)}
-                />
-              ))}
-            </div>
+            ></div>
             {drawnTile ? (
-              <div style={{ marginLeft: 12, boxShadow: '0 0 8px #888' }}>
+              <div style={{ marginLeft: 12 }}>
                 <TileButton
                   tile={drawnTile}
                   disabled={!canDiscard}
+                  direction="up"
                   onClick={() => onDiscard(drawnTile.id)}
                 />
               </div>
             ) : null}
           </div>
-          <div style={{ marginTop: 8, textAlign: 'center', color: '#555' }}>
-            揃い数: <b>{evaluation.totalSets}</b> / 現在得点:{' '}
-            <b>{evaluation.points}</b> / 目標 {winTarget}
-          </div>
         </div>
 
-        <TableCenter wallCount={state.wall.length} turn={state.turn} />
+        <TableCenter
+          wallCount={state.wall.length}
+          turn={state.turn}
+          scores={scores}
+        />
       </div>
     </section>
   );
