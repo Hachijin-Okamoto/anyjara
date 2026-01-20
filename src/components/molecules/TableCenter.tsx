@@ -14,10 +14,8 @@ export default function TableCenter({
   return (
     <div
       style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
+        width: 100,
+        height: 100,
         textAlign: 'center',
         color: '#666',
         background: 'white',
@@ -25,7 +23,7 @@ export default function TableCenter({
         borderRadius: 12,
         border: '1px solid #eee',
         minWidth: 160,
-        minHeight: 140,
+        minHeight: 160,
       }}
     >
       <div style={{ display: 'grid', gap: 2, marginBottom: 10 }}>
