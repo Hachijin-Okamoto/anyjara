@@ -9,20 +9,25 @@ export default function App() {
   const {
     state,
     statusText,
-    evaluation,
-    winTarget,
+    currentRule,
     canStart,
     canDiscard,
     rules,
-    selectedRuleIndex,
-    setSelectedRuleIndex,
+    currentRuleIndex,
+    setCurrentRuleIndex,
     startGame,
     discard,
+    aiStrategies,
+    playerStrategyIds,
+    setPlayerStrategyIds,
+    evaluation,
+    setEvaluationTarget,
+    startEvaluation,
   } = useGame();
 
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ margin: 0 }}>Donjara (Minimal) - 4 Players</h1>
+      <h1 style={{ margin: 0 }}>Anyjara - 4 Players</h1>
       <p style={{ marginTop: 8, color: '#555' }}>{statusText}</p>
 
       <GameControls
@@ -30,8 +35,13 @@ export default function App() {
         wallCount={state.wall.length}
         onStart={startGame}
         rules={rules}
-        selectedRuleIndex={selectedRuleIndex}
-        onSelectRule={setSelectedRuleIndex}
+        selectedRuleIndex={currentRuleIndex}
+        onSelectRule={setCurrentRuleIndex}
+        aiStrategies={aiStrategies}
+        playerStrategyIds={playerStrategyIds}
+        onSelectPlayerStrategy={(playerId, strategyId) =>
+          setPlayerStrategyIds((prev) => ({ ...prev, [playerId]: strategyId }))
+        }
       />
 
       <GameSectionGrid>
@@ -40,15 +50,14 @@ export default function App() {
           humanId={HUMAN}
           canDiscard={canDiscard}
           onDiscard={discard}
-          evaluation={evaluation}
-          winTarget={winTarget}
         />
-        <RulesPanel
-          rule={state.rule}
-          ruleName={state.ruleName}
+        <RulesPanel rule={currentRule} />
+        <LogPanel
+          log={state.log}
           evaluation={evaluation}
+          onSetEvaluationTarget={setEvaluationTarget}
+          onStartEvaluation={startEvaluation}
         />
-        <LogPanel log={state.log} />
       </GameSectionGrid>
 
       <footer style={{ marginTop: 16, color: '#666', fontSize: 13 }}>

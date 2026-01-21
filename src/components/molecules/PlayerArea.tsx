@@ -18,7 +18,6 @@ type PlayerAreaProps = {
 };
 
 export default function PlayerArea({
-  label,
   handTiles,
   discards,
   tsumoTile,
@@ -30,7 +29,6 @@ export default function PlayerArea({
   style,
 }: PlayerAreaProps) {
   const hasHandSection = handTiles !== undefined;
-  //const hasDiscardSection = discards !== undefined;
   const hasTsumoTile = tsumoTile !== undefined;
   const safeHandTiles = handTiles ?? [];
   const safeDiscards = discards ?? [];
@@ -45,12 +43,6 @@ export default function PlayerArea({
           gap: 0,
           alignItems: 'center',
         };
-  /*const discardTilesStyle: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${discardColumns}, auto)`,
-    gap: 6,
-    justifyContent: 'center',
-  };*/
   const tileWrapperStyle: CSSProperties = { transformOrigin: 'center' };
 
   if (direction === 'up') {
@@ -96,6 +88,17 @@ export default function PlayerArea({
         style={{ ...style, display: 'grid', gap: 8, justifyItems: 'center' }}
       >
         <div style={{ display: 'flex' }}>
+          {hasTsumoTile ? (
+            <div style={{ marginRight: 10 }}>
+              <TileButton
+                tile={tsumoTile}
+                disabled={!canDiscard}
+                direction={direction}
+                isHidden={!showHandFaces}
+                onClick={() => onClick?.(tsumoTile.id)}
+              />
+            </div>
+          ) : null}
           {hasHandSection ? (
             <div style={tilesStyle}>
               {safeHandTiles.slice(-handLimit).map((t) => (
@@ -109,17 +112,6 @@ export default function PlayerArea({
               ))}
             </div>
           ) : null}
-          {hasTsumoTile ? (
-            <div style={{ marginLeft: 10 }}>
-              <TileButton
-                tile={tsumoTile}
-                disabled={!canDiscard}
-                direction={direction}
-                isHidden={!showHandFaces}
-                onClick={() => onClick?.(tsumoTile.id)}
-              />
-            </div>
-          ) : null}
         </div>
         <InsideWall discards={safeDiscards} direction={direction} />
       </div>
@@ -129,27 +121,39 @@ export default function PlayerArea({
       <div
         style={{ ...style, display: 'grid', gap: 8, justifyItems: 'center' }}
       >
-        <div style={{ color: '#555', textAlign: 'center' }}>{label}</div>
         <div style={{ display: 'flex' }}>
-          <div style={{ position: 'absolute', right: 327, top: 160 }}>
+          <div style={{ position: 'absolute', right: 327, top: 140 }}>
             <InsideWall discards={safeDiscards} direction={direction} />
           </div>
-          {hasHandSection ? (
-            <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
-              <div style={tilesStyle}>
-                {safeHandTiles.slice(-handLimit).map((t) => (
-                  <div key={t.id} style={tileWrapperStyle}>
-                    <TileButton
-                      tile={t}
-                      disabled
-                      direction={direction}
-                      isHidden={!showHandFaces}
-                    />
-                  </div>
-                ))}
+          <div>
+            {hasTsumoTile ? (
+              <div style={{ marginBottom: 10 }}>
+                <TileButton
+                  tile={tsumoTile}
+                  disabled
+                  direction={direction}
+                  isHidden={!showHandFaces}
+                  onClick={() => onClick?.(tsumoTile.id)}
+                />
               </div>
-            </div>
-          ) : null}
+            ) : null}
+            {hasHandSection ? (
+              <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
+                <div style={tilesStyle}>
+                  {safeHandTiles.slice(-handLimit).map((t) => (
+                    <div key={t.id} style={tileWrapperStyle}>
+                      <TileButton
+                        tile={t}
+                        disabled
+                        direction={direction}
+                        isHidden={!showHandFaces}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -158,25 +162,37 @@ export default function PlayerArea({
       <div
         style={{ ...style, display: 'grid', gap: 8, justifyItems: 'center' }}
       >
-        <div style={{ color: '#555', textAlign: 'center' }}>{label}</div>
         <div style={{ display: 'flex' }}>
-          {hasHandSection ? (
-            <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
-              <div style={tilesStyle}>
-                {safeHandTiles.slice(-handLimit).map((t) => (
-                  <div key={t.id} style={tileWrapperStyle}>
-                    <TileButton
-                      tile={t}
-                      disabled
-                      direction={direction}
-                      isHidden={!showHandFaces}
-                    />
-                  </div>
-                ))}
+          <div>
+            {hasHandSection ? (
+              <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
+                <div style={tilesStyle}>
+                  {safeHandTiles.slice(-handLimit).map((t) => (
+                    <div key={t.id} style={tileWrapperStyle}>
+                      <TileButton
+                        tile={t}
+                        disabled
+                        direction={direction}
+                        isHidden={!showHandFaces}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
-          <div style={{ position: 'absolute', left: 327, top: 160 }}>
+            ) : null}
+            {hasTsumoTile ? (
+              <div style={{ marginTop: 10 }}>
+                <TileButton
+                  tile={tsumoTile}
+                  disabled
+                  direction={direction}
+                  isHidden={!showHandFaces}
+                  onClick={() => onClick?.(tsumoTile.id)}
+                />
+              </div>
+            ) : null}
+          </div>
+          <div style={{ position: 'absolute', left: 327, top: 140 }}>
             <InsideWall discards={safeDiscards} direction={direction} />
           </div>
         </div>

@@ -24,20 +24,13 @@ export default function TableCenter({
         border: '1px solid #eee',
         minWidth: 160,
         minHeight: 160,
+        position: 'relative',
       }}
     >
-      <div style={{ display: 'grid', gap: 2, marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: '#666' }}>山: {wallCount}</div>
-        <div style={{ fontSize: 12, color: '#666' }}>手番: P{turn}</div>
-      </div>
-      <div style={{ position: 'relative', height: 72 }}>
+      <div style={{ gap: 2, marginBottom: 10 }}>
         <div
           style={{
-            position: 'absolute',
-            top: -8,
-            left: '50%',
-            transform: 'translateX(-50%) rotate(180deg)',
-            fontSize: 12,
+            transform: 'rotate(180deg)',
             color: turn === 2 ? '#d64545' : '#555',
             whiteSpace: 'nowrap',
           }}
@@ -47,42 +40,51 @@ export default function TableCenter({
         <div
           style={{
             position: 'absolute',
-            right: -8,
-            top: '50%',
-            transform: 'translateY(-50%) rotate(270deg)',
-            fontSize: 12,
-            color: turn === 3 ? '#d64545' : '#555',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          P3: {scores[3]}
-        </div>
-        <div
-          style={{
-            position: 'absolute',
-            left: -8,
-            top: '50%',
-            transform: 'translateY(-50%) rotate(90deg)',
-            fontSize: 12,
-            color: turn === 1 ? '#d64545' : '#555',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          P1: {scores[1]}
-        </div>
-        <div
-          style={{
-            position: 'absolute',
-            bottom: -8,
             left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: 12,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <div style={{ color: '#666' }}>山: {wallCount}</div>
+          <div style={{ color: '#666' }}>手番: P{turn}</div>
+        </div>
+        <div
+          style={{
             color: turn === 0 ? '#d64545' : '#555',
             whiteSpace: 'nowrap',
+            position: 'absolute',
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
           }}
         >
           P0: {scores[0]}
         </div>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%) rotate(270deg)',
+          color: turn === 3 ? '#d64545' : '#555',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        P3: {scores[3]}
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%) rotate(90deg)',
+          color: turn === 1 ? '#d64545' : '#555',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        P1: {scores[1]}
       </div>
     </div>
   );

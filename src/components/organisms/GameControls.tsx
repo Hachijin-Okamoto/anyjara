@@ -1,5 +1,6 @@
 import ActionButton from '@/components/atoms/ActionButton';
-import { type RuleDefinition } from '@/hooks/useGame';
+import { type PlayerId } from '@/hooks/useGame';
+import { type RuleDefinition } from '@hooks/ruleModule';
 
 type GameControlsProps = {
   canStart: boolean;
@@ -8,6 +9,9 @@ type GameControlsProps = {
   rules: RuleDefinition[];
   selectedRuleIndex: number;
   onSelectRule: (index: number) => void;
+  aiStrategies: { id: string; name: string }[];
+  playerStrategyIds: Record<PlayerId, string>;
+  onSelectPlayerStrategy: (playerId: PlayerId, strategyId: string) => void;
 };
 
 export default function GameControls({
@@ -17,7 +21,16 @@ export default function GameControls({
   rules,
   selectedRuleIndex,
   onSelectRule,
+  aiStrategies,
+  playerStrategyIds,
+  onSelectPlayerStrategy,
 }: GameControlsProps) {
+  const playerIds: PlayerId[] = [0, 1, 2, 3];
+  const availableStrategies = (playerId: PlayerId) =>
+    playerId === 0
+      ? aiStrategies
+      : aiStrategies.filter((strategy) => strategy.id !== 'human');
+
   return (
     <div
       style={{
@@ -25,6 +38,7 @@ export default function GameControls({
         gap: 12,
         alignItems: 'center',
         marginBottom: 16,
+        flexWrap: 'wrap',
       }}
     >
       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -42,12 +56,41 @@ export default function GameControls({
           }}
         >
           {rules.map((rule, index) => (
-            <option key={`${rule.ruleName}-${index}`} value={index}>
-              {rule.ruleName}
+            <option key={`${rule.name}-${index}`} value={index}>
+              {rule.name}
             </option>
           ))}
         </select>
       </label>
+      {playerIds.map((playerId) => (
+        <label
+          key={`strategy-${playerId}`}
+          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+        >
+          <span style={{ color: '#444', fontWeight: 600 }}>
+            P{playerId}戦略
+          </span>
+          <select
+            value={playerStrategyIds[playerId]}
+            onChange={(event) =>
+              onSelectPlayerStrategy(playerId, event.target.value)
+            }
+            style={{
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: '1px solid #ddd',
+              background: 'white',
+              minWidth: 180,
+            }}
+          >
+            {availableStrategies(playerId).map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
       <ActionButton onClick={onStart} disabled={!canStart}>
         Start Game
       </ActionButton>

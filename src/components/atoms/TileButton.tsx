@@ -15,7 +15,7 @@ export default function TileButton({
   scale?: number;
   onClick?: () => void;
 }) {
-  const background = isHidden ? '#bdbdbd' : tile.color;
+  const background = isHidden ? '#bdbdbd' : tile.colorCode;
   const borderColor = isHidden ? '#b0b0b0' : '#ddd';
   const textColor = isHidden ? '#6b6b6b' : '#fff';
   const label = isHidden ? '' : tile.label;
