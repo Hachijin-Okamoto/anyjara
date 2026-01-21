@@ -85,7 +85,7 @@ export default function TableBoard({
           overflow: 'hidden',
         }}
       >
-        <div style={{ position: 'absolute', left: 0, top: 120 }}>
+        <div style={{ position: 'absolute', left: 0, top: 140 }}>
           <PlayerArea
             label="P1"
             handTiles={handResults[1].baseHand}
@@ -96,7 +96,7 @@ export default function TableBoard({
             canDiscard={false}
           />
         </div>
-        <div style={{ position: 'absolute', right: 0, top: 120 }}>
+        <div style={{ position: 'absolute', right: 0, top: 140 }}>
           <PlayerArea
             label="P3"
             handTiles={handResults[3].baseHand}

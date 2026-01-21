@@ -22,7 +22,7 @@ export default function App() {
 
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ margin: 0 }}>Donjara (Minimal) - 4 Players</h1>
+      <h1 style={{ margin: 0 }}>Anyjara - 4 Players</h1>
       <p style={{ marginTop: 8, color: '#555' }}>{statusText}</p>
 
       <GameControls
