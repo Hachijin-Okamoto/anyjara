@@ -9,13 +9,12 @@ export default function App() {
   const {
     state,
     statusText,
-    evaluation,
-    winTarget,
+    currentRule,
     canStart,
     canDiscard,
     rules,
-    selectedRuleIndex,
-    setSelectedRuleIndex,
+    currentRuleIndex,
+    setCurrentRuleIndex,
     startGame,
     discard,
   } = useGame();
@@ -30,8 +29,8 @@ export default function App() {
         wallCount={state.wall.length}
         onStart={startGame}
         rules={rules}
-        selectedRuleIndex={selectedRuleIndex}
-        onSelectRule={setSelectedRuleIndex}
+        selectedRuleIndex={currentRuleIndex}
+        onSelectRule={setCurrentRuleIndex}
       />
 
       <GameSectionGrid>
@@ -40,14 +39,8 @@ export default function App() {
           humanId={HUMAN}
           canDiscard={canDiscard}
           onDiscard={discard}
-          evaluation={evaluation}
-          winTarget={winTarget}
         />
-        <RulesPanel
-          rule={state.rule}
-          ruleName={state.ruleName}
-          evaluation={evaluation}
-        />
+        <RulesPanel rule={currentRule} />
         <LogPanel log={state.log} />
       </GameSectionGrid>
 

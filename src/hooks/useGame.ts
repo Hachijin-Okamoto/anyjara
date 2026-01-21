@@ -1,59 +1,17 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 
 import { type Tile } from '@/entity/Tile';
-import rawRuleConfig from '../../rule.json';
+import { type RuleDefinition, type YakuRule, rules } from './ruleModule';
 
 export type PlayerId = 0 | 1 | 2 | 3;
 
 type Phase = 'idle' | 'draw' | 'discard' | 'end';
 
-type ColorRule = {
-  id: string;
-  label: string;
-  color: string;
-  copies: number;
-};
-
-type YakuRule = {
-  id: string;
-  name: string;
-  type: 'set-of-three';
-  color: 'any' | string;
-  setsRequired: number;
-  points: number;
-};
-
-export type RuleConfig = {
-  handSize: number;
-  winHandSize?: number;
-  colors: ColorRule[];
-  yaku: YakuRule[];
-  win: {
-    minPoints: number;
-  };
-};
-
-type RuleDefinitionRaw = {
-  ruleName: string;
-  body: Partial<RuleConfig>;
-};
-
-export type RuleDefinition = {
-  ruleName: string;
-  rule: RuleConfig;
-};
-
-export type YakuResult = {
-  id: string;
-  name: string;
-  points: number;
-  achieved: boolean;
-};
-
-export type YakuEvaluation = {
-  results: YakuResult[];
-  points: number;
-  totalSets: number;
+export type YakuEvaluationResult = {
+  isWon: boolean;
+  totalPoints: number;
+  achievedYakus: YakuRule[];
+  bestYaku: YakuRule | null;
 };
 
 export type GameState = {
@@ -61,11 +19,13 @@ export type GameState = {
   hands: Record<PlayerId, Tile[]>;
   discards: Record<PlayerId, Tile[]>;
   lastTsumo: Record<PlayerId, string | null>;
+  isTempai: Record<PlayerId, boolean>;
+  isReached: Record<PlayerId, boolean>;
+  score: Record<PlayerId, number>;
   turn: PlayerId;
   phase: Phase;
   log: string[];
-  ruleName: string;
-  rule: RuleConfig;
+  rule: RuleDefinition;
 };
 
 type Action =
@@ -73,113 +33,40 @@ type Action =
   | { type: 'DRAW' }
   | { type: 'DISCARD'; tileId: string };
 
-const DEFAULT_RULE: RuleConfig = {
-  handSize: 8,
-  winHandSize: 9,
-  colors: [
-    { id: 'red', label: 'Red', color: '#e34b4b', copies: 12 },
-    { id: 'blue', label: 'Blue', color: '#3a6fe2', copies: 12 },
-    { id: 'green', label: 'Green', color: '#3ca36b', copies: 12 },
-    { id: 'yellow', label: 'Yellow', color: '#e2b93b', copies: 12 },
-  ],
-  yaku: [
-    {
-      id: 'triple-sets-3',
-      name: 'Triple Sets x3',
-      type: 'set-of-three',
-      color: 'any',
-      setsRequired: 3,
-      points: 3,
-    },
-  ],
-  win: { minPoints: 3 },
-};
-
-function normalizeRule(raw: Partial<RuleConfig>): RuleConfig {
-  const colors =
-    raw.colors && raw.colors.length > 0 ? raw.colors : DEFAULT_RULE.colors;
-  const handSize = raw.handSize ?? DEFAULT_RULE.handSize;
-  const winHandSize = raw.winHandSize ?? handSize + 1;
-  const yaku = raw.yaku && raw.yaku.length > 0 ? raw.yaku : DEFAULT_RULE.yaku;
-  const minPoints = raw.win?.minPoints ?? DEFAULT_RULE.win.minPoints;
-  return {
-    handSize,
-    winHandSize,
-    colors,
-    yaku,
-    win: { minPoints },
-  };
-}
-
-function toRuleDefinitions(raw: unknown): RuleDefinition[] {
-  const source = raw as {
-    rules?: RuleDefinitionRaw[];
-    ruleName?: string;
-    body?: Partial<RuleConfig>;
-  };
-
-  const rawRules: Array<RuleDefinitionRaw | Partial<RuleConfig>> = [];
-  if (Array.isArray(raw)) {
-    rawRules.push(...(raw as RuleDefinitionRaw[]));
-  } else if (Array.isArray(source?.rules)) {
-    rawRules.push(...source.rules);
-  } else if (source?.body) {
-    rawRules.push({
-      ruleName: source.ruleName ?? 'Default',
-      body: source.body,
-    });
-  } else if (raw && typeof raw === 'object') {
-    rawRules.push(raw as Partial<RuleConfig>);
-  }
-
-  const normalized = rawRules.map((rule, index) => {
-    if ('body' in rule) {
-      return {
-        ruleName: rule.ruleName || `Rule ${index + 1}`,
-        rule: normalizeRule(rule.body ?? {}),
-      };
-    }
-    return {
-      ruleName: `Rule ${index + 1}`,
-      rule: normalizeRule(rule),
-    };
-  });
-
-  if (normalized.length === 0) {
-    return [{ ruleName: 'Default', rule: normalizeRule(DEFAULT_RULE) }];
-  }
-
-  return normalized;
-}
-
-export const RULES: RuleDefinition[] = toRuleDefinitions(rawRuleConfig);
+const DEFAULT_RULE_DEF = rules[0];
 
 const PLAYER_IDS: PlayerId[] = [0, 1, 2, 3];
 export const HUMAN: PlayerId = 0;
 
-const DEFAULT_RULE_DEF = RULES[0];
-
+// stateの初期値用
 const INITIAL: GameState = {
   wall: [],
   hands: { 0: [], 1: [], 2: [], 3: [] },
   discards: { 0: [], 1: [], 2: [], 3: [] },
   lastTsumo: { 0: null, 1: null, 2: null, 3: null },
+  isTempai: { 0: false, 1: false, 2: false, 3: false },
+  isReached: { 0: false, 1: false, 2: false, 3: false },
+  score: { 0: 0, 1: 0, 2: 0, 3: 0 },
   turn: 0,
   phase: 'idle',
   log: ['「Start Game」で開始'],
-  ruleName: DEFAULT_RULE_DEF.ruleName,
-  rule: DEFAULT_RULE_DEF.rule,
+  rule: DEFAULT_RULE_DEF,
 };
 
-function makeWall(rule: RuleConfig): Tile[] {
+/**
+ * ルールに基づいてタイル情報を渡して山を作る
+ * @returns タイルの配列（シャッフルされていないので毎回同じ）
+ */
+function makeWall(rule: RuleDefinition): Tile[] {
   const tiles: Tile[] = [];
-  for (const c of rule.colors) {
+  for (const c of rule.tiles) {
     for (let i = 1; i <= c.copies; i++) {
       tiles.push({
         id: `${c.id}-${i}`,
-        kind: c.id,
+        name: c.id,
         label: c.label,
-        color: c.color,
+        colorId: c.colorId,
+        colorCode: c.colorCode,
       });
     }
   }
@@ -195,6 +82,10 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/**
+ * 1つツモる
+ * @returns wallはツモった後の山
+ */
 function drawOne(wall: Tile[]): { tile: Tile | null; wall: Tile[] } {
   if (wall.length === 0) return { tile: null, wall };
   const [top, ...rest] = wall;
@@ -206,55 +97,124 @@ function sortHand(hand: Tile[]): Tile[] {
   return [...hand].sort((x, y) => key(x).localeCompare(key(y)));
 }
 
-function evaluateYaku(hand: Tile[], rule: RuleConfig): YakuEvaluation {
-  const counts = new Map<string, number>();
+function evaluateYaku(
+  hand: Tile[],
+  rule: RuleDefinition,
+): YakuEvaluationResult {
+  const nameCounts = new Map<string, number>();
+  const colorCounts = new Map<string, number>();
   for (const t of hand) {
-    counts.set(t.kind, (counts.get(t.kind) ?? 0) + 1);
+    nameCounts.set(t.name, (nameCounts.get(t.name) ?? 0) + 1);
+    colorCounts.set(t.colorId, (colorCounts.get(t.colorId) ?? 0) + 1);
   }
 
-  let totalSets = 0;
-  for (const c of counts.values()) {
-    totalSets += Math.floor(c / 3);
+  const nameToColorId = new Map<string, string>();
+  for (const tile of rule.tiles) {
+    nameToColorId.set(tile.id, tile.colorId);
   }
 
-  const results = rule.yaku.map((yaku) => {
-    if (yaku.type === 'set-of-three') {
-      const sets =
-        yaku.color === 'any'
-          ? totalSets
-          : Math.floor((counts.get(yaku.color) ?? 0) / 3);
-      const achieved = sets >= yaku.setsRequired;
-      return {
-        id: yaku.id,
-        name: yaku.name,
-        points: yaku.points,
-        achieved,
-      };
+  const yakus = rule.yakus ?? [];
+
+  const takeFromMap = (
+    map: Map<string, number>,
+    key: string,
+    count: number,
+  ) => {
+    const current = map.get(key) ?? 0;
+    if (current < count) return false;
+    map.set(key, current - count);
+    return true;
+  };
+
+  const achievedYakus: YakuRule[] = [];
+  for (const yaku of yakus) {
+    const remainingNameCounts = new Map(nameCounts);
+    const remainingColorCounts = new Map(colorCounts);
+    const anyColorRequirements: number[] = [];
+    let achieved = true;
+
+    const requirements = yaku.required ?? [];
+    const nameRequirements = requirements.filter((req) => req.name);
+    const colorRequirements = requirements.filter(
+      (req) => !req.name && req.color,
+    );
+
+    for (const req of nameRequirements) {
+      if (!req.name) continue;
+      if (!takeFromMap(remainingNameCounts, req.name, req.count)) {
+        achieved = false;
+        break;
+      }
+      const colorId = nameToColorId.get(req.name);
+      if (colorId && !takeFromMap(remainingColorCounts, colorId, req.count)) {
+        achieved = false;
+        break;
+      }
     }
-    return {
-      id: yaku.id,
-      name: yaku.name,
-      points: yaku.points,
-      achieved: false,
-    };
-  });
 
-  const points = results.reduce(
-    (sum, r) => (r.achieved ? sum + r.points : sum),
+    if (achieved) {
+      for (const req of colorRequirements) {
+        if (!req.color) continue;
+        if (req.color === 'any') {
+          anyColorRequirements.push(req.count);
+        } else if (!takeFromMap(remainingColorCounts, req.color, req.count)) {
+          achieved = false;
+          break;
+        }
+      }
+    }
+
+    if (achieved && anyColorRequirements.length > 0) {
+      const availableColors = Array.from(remainingColorCounts.entries())
+        .filter(([, count]) => count > 0)
+        .map(([colorId, count]) => ({ colorId, count }));
+      const sortedRequirements = [...anyColorRequirements].sort(
+        (a, b) => b - a,
+      );
+
+      for (const reqCount of sortedRequirements) {
+        let bestIndex = -1;
+        let bestCount = Infinity;
+        for (let i = 0; i < availableColors.length; i++) {
+          const candidate = availableColors[i];
+          if (candidate.count >= reqCount && candidate.count < bestCount) {
+            bestIndex = i;
+            bestCount = candidate.count;
+          }
+        }
+        if (bestIndex === -1) {
+          achieved = false;
+          break;
+        }
+        availableColors.splice(bestIndex, 1);
+      }
+    }
+
+    if (achieved) {
+      achievedYakus.push(yaku);
+    }
+  }
+
+  const totalPoints = achievedYakus.reduce(
+    (sum, yaku) => sum + (yaku.point ?? 0),
     0,
   );
+  const bestYaku =
+    achievedYakus.length > 0
+      ? achievedYakus.reduce((best, current) =>
+          current.point > best.point ? current : best,
+        )
+      : null;
 
-  return { results, points, totalSets };
+  return { isWon: totalPoints > 0, totalPoints, achievedYakus, bestYaku };
 }
 
 function canWin(
   hand: Tile[],
-  rule: RuleConfig,
-): { achieved: boolean; points: number; results: YakuResult[] } {
-  const evaluation = evaluateYaku(hand, rule);
-  const hasSize = hand.length >= (rule.winHandSize ?? rule.handSize + 1);
-  const achieved = hasSize && evaluation.points >= rule.win.minPoints;
-  return { achieved, points: evaluation.points, results: evaluation.results };
+  rule: RuleDefinition,
+): { achieved: boolean; results: YakuEvaluationResult } {
+  const evaluationResult = evaluateYaku(hand, rule);
+  return { achieved: evaluationResult.isWon, results: evaluationResult };
 }
 
 function nextPlayer(turn: PlayerId): PlayerId {
@@ -266,7 +226,7 @@ function nextPlayer(turn: PlayerId): PlayerId {
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'START_GAME': {
-      const { rule, ruleName } = action.rule;
+      const rule = action.rule;
       const wall = shuffle(makeWall(rule));
       let w = wall;
       const hands: Record<PlayerId, Tile[]> = { 0: [], 1: [], 2: [], 3: [] };
@@ -288,10 +248,17 @@ function reducer(state: GameState, action: Action): GameState {
         },
         discards: { 0: [], 1: [], 2: [], 3: [] },
         lastTsumo: { 0: null, 1: null, 2: null, 3: null },
+        isTempai: { 0: false, 1: false, 2: false, 3: false },
+        isReached: { 0: false, 1: false, 2: false, 3: false },
+        score: {
+          0: action.rule.initialScore,
+          1: action.rule.initialScore,
+          2: action.rule.initialScore,
+          3: action.rule.initialScore,
+        },
         turn: 0,
         phase: 'draw',
         log: ['ゲーム開始。P0（あなた）から。自動で1枚引きます。'],
-        ruleName,
         rule,
       };
     }
@@ -312,10 +279,12 @@ function reducer(state: GameState, action: Action): GameState {
       const newHand = sortHand([...state.hands[p], tile]);
       const winCheck = canWin(newHand, state.rule);
       if (winCheck.achieved) {
-        const yakuNames = winCheck.results
-          .filter((r) => r.achieved)
-          .map((r) => r.name)
-          .join(', ');
+        const yakuNames =
+          winCheck.results.achievedYakus.length > 0
+            ? winCheck.results.achievedYakus
+                .map((yaku) => yaku.name)
+                .join(' / ')
+            : null;
         return {
           ...state,
           wall,
@@ -324,7 +293,7 @@ function reducer(state: GameState, action: Action): GameState {
           phase: 'end',
           log: [
             ...state.log,
-            `P${p} が ${tile.label} を引いた。役成立！得点 ${winCheck.points}。`,
+            `P${p} が ${tile.label} を引いた。役成立！得点 ${winCheck.results.totalPoints}.`,
             `成立役: ${yakuNames || 'なし'}`,
             'ゲーム終了。',
           ],
@@ -374,17 +343,19 @@ function reducer(state: GameState, action: Action): GameState {
 
 export function useGame() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const [selectedRuleIndex, setSelectedRuleIndex] = useState(0);
-  const selectedRule = RULES[selectedRuleIndex] ?? RULES[0];
 
   const canStart = state.phase === 'idle' || state.phase === 'end';
   const canDiscard = state.phase === 'discard' && state.turn === HUMAN;
 
-  const evaluation = useMemo(
-    () => evaluateYaku(state.hands[HUMAN], state.rule),
-    [state.hands, state.rule],
-  );
-  const winTarget = state.rule.win.minPoints;
+  const evaluations = useMemo(() => {
+    const results: Record<PlayerId, YakuEvaluationResult> = {
+      0: evaluateYaku(state.hands[0], state.rule),
+      1: evaluateYaku(state.hands[1], state.rule),
+      2: evaluateYaku(state.hands[2], state.rule),
+      3: evaluateYaku(state.hands[3], state.rule),
+    };
+    return results;
+  }, [state.hands, state.rule]);
 
   const statusText = useMemo(() => {
     if (state.phase === 'idle') return 'Start Game で開始';
@@ -392,6 +363,7 @@ export function useGame() {
     return `手番: P${state.turn} / フェーズ: ${state.phase}`;
   }, [state.phase, state.turn]);
 
+  /* ゲームを自動で動かす部分 */
   useEffect(() => {
     if (state.phase === 'idle' || state.phase === 'end') return undefined;
 
@@ -416,20 +388,29 @@ export function useGame() {
     return undefined;
   }, [state.phase, state.turn, state.hands]);
 
-  const startGame = () => dispatch({ type: 'START_GAME', rule: selectedRule });
+  // setCurrentRuleIndex(i)を呼ぶことでルールをi番目に変更する
+  const [currentRuleIndex, setCurrentRuleIndex] = useState(0);
+  const currentRule = rules[currentRuleIndex] ?? DEFAULT_RULE_DEF;
+
+  // この関数を呼び出すとゲームが始まる（1局）
+  const startGame = () => dispatch({ type: 'START_GAME', rule: currentRule });
+  /**
+   * この関数を呼ぶと牌を切る
+   * @param tileId 切る牌のID
+   */
   const discard = (tileId: string) => dispatch({ type: 'DISCARD', tileId });
 
   return {
     state,
     statusText,
-    evaluation,
-    winTarget,
+    currentRule,
+    evaluations,
     canStart,
     canDiscard,
-    rules: RULES,
-    selectedRuleIndex,
-    setSelectedRuleIndex,
-    startGame,
-    discard,
+    rules,
+    currentRuleIndex,
+    setCurrentRuleIndex, // ルール変更 setCurrentRuleIndex(i)
+    startGame, // ゲーム開始 startGame()
+    discard, // 牌を切る discard(tileId)
   };
 }

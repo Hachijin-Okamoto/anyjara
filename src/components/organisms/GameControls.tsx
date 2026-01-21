@@ -1,5 +1,5 @@
 import ActionButton from '@/components/atoms/ActionButton';
-import { type RuleDefinition } from '@/hooks/useGame';
+import { type RuleDefinition } from '@hooks/ruleModule';
 
 type GameControlsProps = {
   canStart: boolean;
@@ -42,8 +42,8 @@ export default function GameControls({
           }}
         >
           {rules.map((rule, index) => (
-            <option key={`${rule.ruleName}-${index}`} value={index}>
-              {rule.ruleName}
+            <option key={`${rule.name}-${index}`} value={index}>
+              {rule.name}
             </option>
           ))}
         </select>

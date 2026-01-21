@@ -3,19 +3,13 @@ import { useState } from 'react';
 import ActionButton from '@/components/atoms/ActionButton';
 import PlayerArea from '@/components/molecules/PlayerArea';
 import TableCenter from '@/components/molecules/TableCenter';
-import {
-  type GameState,
-  type PlayerId,
-  type YakuEvaluation,
-} from '@/hooks/useGame';
+import { type GameState, type PlayerId } from '@/hooks/useGame';
 
 type TableBoardProps = {
   state: GameState;
   humanId: PlayerId;
   canDiscard: boolean;
   onDiscard: (tileId: string) => void;
-  evaluation: YakuEvaluation;
-  winTarget: number;
 };
 
 export default function TableBoard({
