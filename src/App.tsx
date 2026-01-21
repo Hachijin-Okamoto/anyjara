@@ -17,6 +17,9 @@ export default function App() {
     setCurrentRuleIndex,
     startGame,
     discard,
+    aiStrategies,
+    aiStrategyId,
+    setAiStrategyId,
   } = useGame();
 
   return (
@@ -31,6 +34,9 @@ export default function App() {
         rules={rules}
         selectedRuleIndex={currentRuleIndex}
         onSelectRule={setCurrentRuleIndex}
+        aiStrategies={aiStrategies}
+        selectedAiStrategyId={aiStrategyId}
+        onSelectAiStrategy={setAiStrategyId}
       />
 
       <GameSectionGrid>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-
 import { type Tile } from '@/entity/Tile';
 import { type RuleDefinition, type YakuRule, rules } from './ruleModule';
+import { AI_STRATEGIES } from './strategy';
 
 export type PlayerId = 0 | 1 | 2 | 3;
 
@@ -223,6 +223,24 @@ function nextPlayer(turn: PlayerId): PlayerId {
   return PLAYER_IDS[next];
 }
 
+function findRonWinner(
+  state: GameState,
+  discarder: PlayerId,
+  discardedTile: Tile,
+): { winner: PlayerId; results: YakuEvaluationResult } | null {
+  let current = discarder;
+  for (let i = 0; i < PLAYER_IDS.length - 1; i++) {
+    current = nextPlayer(current);
+    const hand = state.hands[current];
+    const checkHand = sortHand([...hand, discardedTile]);
+    const winCheck = canWin(checkHand, state.rule);
+    if (winCheck.achieved) {
+      return { winner: current, results: winCheck.results };
+    }
+  }
+  return null;
+}
+
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'START_GAME': {
@@ -323,6 +341,34 @@ function reducer(state: GameState, action: Action): GameState {
 
       const tile = hand[idx];
       const newHand = [...hand.slice(0, idx), ...hand.slice(idx + 1)];
+      const ronResult = findRonWinner(state, p, tile);
+      if (ronResult) {
+        const { winner, results } = ronResult;
+        const yakuNames =
+          results.achievedYakus.length > 0
+            ? results.achievedYakus.map((yaku) => yaku.name).join(' / ')
+            : null;
+        const winnerHand = sortHand([...state.hands[winner], tile]);
+        return {
+          ...state,
+          hands: {
+            ...state.hands,
+            [p]: sortHand(newHand),
+            [winner]: winnerHand,
+          },
+          discards: { ...state.discards, [p]: [...state.discards[p], tile] },
+          lastTsumo: { ...state.lastTsumo, [winner]: tile.id, [p]: null },
+          phase: 'end',
+          log: [
+            ...state.log,
+            `P${p} が ${tile.label} を捨てた。`,
+            `P${winner} がロン！得点 ${results.totalPoints}.`,
+            `成立役: ${yakuNames || 'なし'}`,
+            'ゲーム終了。',
+          ],
+        };
+      }
+
       const next = nextPlayer(p);
 
       return {
@@ -343,6 +389,12 @@ function reducer(state: GameState, action: Action): GameState {
 
 export function useGame() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
+  const [aiStrategyId, setAiStrategyId] = useState(
+    AI_STRATEGIES[1]?.id ?? 'random',
+  );
+  const aiStrategy =
+    AI_STRATEGIES.find((strategy) => strategy.id === aiStrategyId) ??
+    AI_STRATEGIES[0];
 
   const canStart = state.phase === 'idle' || state.phase === 'end';
   const canDiscard = state.phase === 'discard' && state.turn === HUMAN;
@@ -377,8 +429,8 @@ export function useGame() {
     if (state.phase === 'discard' && state.turn !== HUMAN) {
       const hand = state.hands[state.turn];
       if (hand.length === 0) return undefined;
-      const idx = Math.floor(Math.random() * hand.length);
-      const tileId = hand[idx].id;
+      const tileId = aiStrategy.decideDiscard(hand, state.rule);
+      if (!tileId) return undefined;
       const timer = window.setTimeout(() => {
         dispatch({ type: 'DISCARD', tileId });
       }, 500);
@@ -386,7 +438,7 @@ export function useGame() {
     }
 
     return undefined;
-  }, [state.phase, state.turn, state.hands]);
+  }, [state.phase, state.turn, state.hands, state.rule, aiStrategy]);
 
   // setCurrentRuleIndex(i)を呼ぶことでルールをi番目に変更する
   const [currentRuleIndex, setCurrentRuleIndex] = useState(0);
@@ -412,5 +464,8 @@ export function useGame() {
     setCurrentRuleIndex, // ルール変更 setCurrentRuleIndex(i)
     startGame, // ゲーム開始 startGame()
     discard, // 牌を切る discard(tileId)
+    aiStrategies: AI_STRATEGIES,
+    aiStrategyId,
+    setAiStrategyId,
   };
 }

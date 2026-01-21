@@ -32,7 +32,7 @@ export type RuleDefinition = {
 
 // JSONから読めなかったとき用
 const DEFAULT_RULE: RuleDefinition = {
-  name: 'Default Rule',
+  name: 'Default ',
   handSize: 8,
   winHandSize: 9,
   initialScore: 5,
@@ -105,9 +105,9 @@ function toRuleDefinitions(raw: unknown): RuleDefinition[] {
 
   const normalized = rawRule
     .flatMap((r) => {
-      if (r && typeof r === 'object' && 'body' in r) {
+      if (r && typeof r === 'object' && 'body' in r && 'name' in r) {
         const body = (r as { body?: Partial<RuleDefinition> }).body ?? {};
-        return [normalizeRule(body)];
+        return [normalizeRule({ name: r.name, ...body })];
       }
 
       return [normalizeRule(r)];

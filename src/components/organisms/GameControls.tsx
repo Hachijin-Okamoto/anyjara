@@ -8,6 +8,9 @@ type GameControlsProps = {
   rules: RuleDefinition[];
   selectedRuleIndex: number;
   onSelectRule: (index: number) => void;
+  aiStrategies: { id: string; name: string }[];
+  selectedAiStrategyId: string;
+  onSelectAiStrategy: (id: string) => void;
 };
 
 export default function GameControls({
@@ -17,6 +20,9 @@ export default function GameControls({
   rules,
   selectedRuleIndex,
   onSelectRule,
+  aiStrategies,
+  selectedAiStrategyId,
+  onSelectAiStrategy,
 }: GameControlsProps) {
   return (
     <div
@@ -44,6 +50,26 @@ export default function GameControls({
           {rules.map((rule, index) => (
             <option key={`${rule.name}-${index}`} value={index}>
               {rule.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: '#444', fontWeight: 600 }}>AI戦略</span>
+        <select
+          value={selectedAiStrategyId}
+          onChange={(event) => onSelectAiStrategy(event.target.value)}
+          style={{
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: '1px solid #ddd',
+            background: 'white',
+            minWidth: 180,
+          }}
+        >
+          {aiStrategies.map((strategy) => (
+            <option key={strategy.id} value={strategy.id}>
+              {strategy.name}
             </option>
           ))}
         </select>
