@@ -18,8 +18,11 @@ export default function App() {
     startGame,
     discard,
     aiStrategies,
-    aiStrategyId,
-    setAiStrategyId,
+    playerStrategyIds,
+    setPlayerStrategyIds,
+    evaluation,
+    setEvaluationTarget,
+    startEvaluation,
   } = useGame();
 
   return (
@@ -35,8 +38,10 @@ export default function App() {
         selectedRuleIndex={currentRuleIndex}
         onSelectRule={setCurrentRuleIndex}
         aiStrategies={aiStrategies}
-        selectedAiStrategyId={aiStrategyId}
-        onSelectAiStrategy={setAiStrategyId}
+        playerStrategyIds={playerStrategyIds}
+        onSelectPlayerStrategy={(playerId, strategyId) =>
+          setPlayerStrategyIds((prev) => ({ ...prev, [playerId]: strategyId }))
+        }
       />
 
       <GameSectionGrid>
@@ -47,7 +52,12 @@ export default function App() {
           onDiscard={discard}
         />
         <RulesPanel rule={currentRule} />
-        <LogPanel log={state.log} />
+        <LogPanel
+          log={state.log}
+          evaluation={evaluation}
+          onSetEvaluationTarget={setEvaluationTarget}
+          onStartEvaluation={startEvaluation}
+        />
       </GameSectionGrid>
 
       <footer style={{ marginTop: 16, color: '#666', fontSize: 13 }}>

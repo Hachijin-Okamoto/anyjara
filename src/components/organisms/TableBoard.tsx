@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import ActionButton from '@/components/atoms/ActionButton';
+import TileButton from '@/components/atoms/TileButton';
 import PlayerArea from '@/components/molecules/PlayerArea';
 import TableCenter from '@/components/molecules/TableCenter';
 import { type GameState, type PlayerId } from '@/hooks/useGame';
@@ -37,6 +38,7 @@ export default function TableBoard({
   });
 
   const scores = { 0: 0, 1: 0, 2: 0, 3: 0 } as const;
+  const winInfo = state.winInfo;
 
   return (
     <section
@@ -79,6 +81,75 @@ export default function TableBoard({
           overflow: 'hidden',
         }}
       >
+        {winInfo && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(255,255,255,0.78)',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 5,
+            }}
+          >
+            <div
+              style={{
+                width: 'min(92vw, 900px)',
+                background: 'rgba(255,255,255,0.92)',
+                border: '1px solid #ddd',
+                borderRadius: 16,
+                padding: 20,
+                boxShadow: '0 16px 40px rgba(0,0,0,0.12)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}
+                >
+                  <span style={{ fontSize: 22, fontWeight: 700 }}>
+                    P{winInfo.playerId} 勝利
+                  </span>
+                  <span style={{ color: '#666' }}>
+                    {winInfo.winType === 'ron' ? 'ロン' : 'ツモ'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>
+                  得点 {winInfo.points}
+                </div>
+              </div>
+              <div style={{ marginBottom: 12, color: '#444' }}>
+                役:{' '}
+                {winInfo.yakuNames.length > 0
+                  ? winInfo.yakuNames.join(' / ')
+                  : 'なし'}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  background: '#f7f7f7',
+                  border: '1px solid #eee',
+                }}
+              >
+                {winInfo.hand.map((tile) => (
+                  <TileButton key={tile.id} tile={tile} disabled scale={0.9} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{ position: 'absolute', left: 0, top: 140 }}>
           <PlayerArea
             label="P1"

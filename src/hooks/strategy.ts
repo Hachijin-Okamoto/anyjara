@@ -1,13 +1,18 @@
 import type { Tile } from '@/entity/Tile';
 import type { YakuRule, RuleDefinition } from './ruleModule';
 
-type AiStrategy = {
+export type AiStrategy = {
   id: string;
   name: string;
   decideDiscard: (hand: Tile[], rule: RuleDefinition) => string | null;
 };
 
 export const AI_STRATEGIES: AiStrategy[] = [
+  {
+    id: 'human',
+    name: '人間操作',
+    decideDiscard: () => null,
+  },
   {
     id: 'random',
     name: 'ランダム',

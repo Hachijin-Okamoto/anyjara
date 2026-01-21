@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { type Tile } from '@/entity/Tile';
 import { type RuleDefinition, type YakuRule, rules } from './ruleModule';
-import { AI_STRATEGIES } from './strategy';
+import { type AiStrategy, AI_STRATEGIES } from './strategy';
 
 export type PlayerId = 0 | 1 | 2 | 3;
 
@@ -12,6 +12,16 @@ export type YakuEvaluationResult = {
   totalPoints: number;
   achievedYakus: YakuRule[];
   bestYaku: YakuRule | null;
+};
+
+export type EvaluationState = {
+  isRunning: boolean;
+  targetGames: number;
+  totalGames: number;
+  wins: Record<PlayerId, number>;
+  totalWinPoints: Record<PlayerId, number>;
+  draws: number;
+  rule: RuleDefinition;
 };
 
 export type GameState = {
@@ -26,6 +36,13 @@ export type GameState = {
   phase: Phase;
   log: string[];
   rule: RuleDefinition;
+  winInfo: {
+    playerId: PlayerId;
+    points: number;
+    yakuNames: string[];
+    hand: Tile[];
+    winType: 'tsumo' | 'ron';
+  } | null;
 };
 
 type Action =
@@ -37,6 +54,35 @@ const DEFAULT_RULE_DEF = rules[0];
 
 const PLAYER_IDS: PlayerId[] = [0, 1, 2, 3];
 export const HUMAN: PlayerId = 0;
+
+const PLAYER_STRATEGIES_DEFAULT: Record<PlayerId, string> = {
+  0: 'human',
+  1: 'yaku-progress',
+  2: 'yaku-progress',
+  3: 'yaku-progress',
+};
+
+const EVALUATION_STRATEGY_IDS: Record<PlayerId, string> = {
+  0: 'yaku-progress',
+  1: 'random',
+  2: 'random',
+  3: 'random',
+};
+
+const NON_HUMAN_STRATEGIES = AI_STRATEGIES.filter(
+  (strategy) => strategy.id !== 'human',
+);
+const DEFAULT_AI_STRATEGY = NON_HUMAN_STRATEGIES[0] ?? AI_STRATEGIES[0];
+
+const INITIAL_EVALUATION: EvaluationState = {
+  isRunning: false,
+  targetGames: 100,
+  totalGames: 0,
+  wins: { 0: 0, 1: 0, 2: 0, 3: 0 },
+  totalWinPoints: { 0: 0, 1: 0, 2: 0, 3: 0 },
+  draws: 0,
+  rule: DEFAULT_RULE_DEF,
+};
 
 // stateの初期値用
 const INITIAL: GameState = {
@@ -51,6 +97,7 @@ const INITIAL: GameState = {
   phase: 'idle',
   log: ['「Start Game」で開始'],
   rule: DEFAULT_RULE_DEF,
+  winInfo: null,
 };
 
 /**
@@ -95,6 +142,13 @@ function drawOne(wall: Tile[]): { tile: Tile | null; wall: Tile[] } {
 function sortHand(hand: Tile[]): Tile[] {
   const key = (t: Tile) => `${t.label}-${t.id}`;
   return [...hand].sort((x, y) => key(x).localeCompare(key(y)));
+}
+
+function getStrategyById(id: string): AiStrategy {
+  if (id === 'human') return DEFAULT_AI_STRATEGY;
+  return (
+    AI_STRATEGIES.find((strategy) => strategy.id === id) ?? DEFAULT_AI_STRATEGY
+  );
 }
 
 function evaluateYaku(
@@ -195,16 +249,13 @@ function evaluateYaku(
     }
   }
 
-  const totalPoints = achievedYakus.reduce(
-    (sum, yaku) => sum + (yaku.point ?? 0),
-    0,
-  );
   const bestYaku =
     achievedYakus.length > 0
       ? achievedYakus.reduce((best, current) =>
           current.point > best.point ? current : best,
         )
       : null;
+  const totalPoints = bestYaku?.point ?? 0;
 
   return { isWon: totalPoints > 0, totalPoints, achievedYakus, bestYaku };
 }
@@ -223,17 +274,18 @@ function nextPlayer(turn: PlayerId): PlayerId {
   return PLAYER_IDS[next];
 }
 
-function findRonWinner(
-  state: GameState,
+function findRonWinnerFromHands(
+  hands: Record<PlayerId, Tile[]>,
+  rule: RuleDefinition,
   discarder: PlayerId,
   discardedTile: Tile,
 ): { winner: PlayerId; results: YakuEvaluationResult } | null {
   let current = discarder;
   for (let i = 0; i < PLAYER_IDS.length - 1; i++) {
     current = nextPlayer(current);
-    const hand = state.hands[current];
+    const hand = hands[current];
     const checkHand = sortHand([...hand, discardedTile]);
-    const winCheck = canWin(checkHand, state.rule);
+    const winCheck = canWin(checkHand, rule);
     if (winCheck.achieved) {
       return { winner: current, results: winCheck.results };
     }
@@ -278,6 +330,7 @@ function reducer(state: GameState, action: Action): GameState {
         phase: 'draw',
         log: ['ゲーム開始。P0（あなた）から。自動で1枚引きます。'],
         rule,
+        winInfo: null,
       };
     }
 
@@ -289,6 +342,7 @@ function reducer(state: GameState, action: Action): GameState {
         return {
           ...state,
           phase: 'end',
+          winInfo: null,
           log: [...state.log, '山が尽きました。ゲーム終了。'],
         };
       }
@@ -309,6 +363,13 @@ function reducer(state: GameState, action: Action): GameState {
           hands: { ...state.hands, [p]: newHand },
           lastTsumo: { ...state.lastTsumo, [p]: tile.id },
           phase: 'end',
+          winInfo: {
+            playerId: p,
+            points: winCheck.results.totalPoints,
+            yakuNames: winCheck.results.achievedYakus.map((yaku) => yaku.name),
+            hand: newHand,
+            winType: 'tsumo',
+          },
           log: [
             ...state.log,
             `P${p} が ${tile.label} を引いた。役成立！得点 ${winCheck.results.totalPoints}.`,
@@ -341,7 +402,12 @@ function reducer(state: GameState, action: Action): GameState {
 
       const tile = hand[idx];
       const newHand = [...hand.slice(0, idx), ...hand.slice(idx + 1)];
-      const ronResult = findRonWinner(state, p, tile);
+      const ronResult = findRonWinnerFromHands(
+        state.hands,
+        state.rule,
+        p,
+        tile,
+      );
       if (ronResult) {
         const { winner, results } = ronResult;
         const yakuNames =
@@ -359,6 +425,13 @@ function reducer(state: GameState, action: Action): GameState {
           discards: { ...state.discards, [p]: [...state.discards[p], tile] },
           lastTsumo: { ...state.lastTsumo, [winner]: tile.id, [p]: null },
           phase: 'end',
+          winInfo: {
+            playerId: winner,
+            points: results.totalPoints,
+            yakuNames: results.achievedYakus.map((yaku) => yaku.name),
+            hand: winnerHand,
+            winType: 'ron',
+          },
           log: [
             ...state.log,
             `P${p} が ${tile.label} を捨てた。`,
@@ -389,15 +462,20 @@ function reducer(state: GameState, action: Action): GameState {
 
 export function useGame() {
   const [state, dispatch] = useReducer(reducer, INITIAL);
-  const [aiStrategyId, setAiStrategyId] = useState(
-    AI_STRATEGIES[1]?.id ?? 'random',
-  );
-  const aiStrategy =
-    AI_STRATEGIES.find((strategy) => strategy.id === aiStrategyId) ??
-    AI_STRATEGIES[0];
+  const [playerStrategyIds, setPlayerStrategyIds] = useState<
+    Record<PlayerId, string>
+  >(PLAYER_STRATEGIES_DEFAULT);
+  const [evaluation, setEvaluation] =
+    useState<EvaluationState>(INITIAL_EVALUATION);
+  const lastPhaseRef = useRef<Phase | null>(null);
+  const evaluationDelayRef = useRef(false);
+  const evaluationTimerRef = useRef<number | null>(null);
 
   const canStart = state.phase === 'idle' || state.phase === 'end';
-  const canDiscard = state.phase === 'discard' && state.turn === HUMAN;
+  const canDiscard =
+    state.phase === 'discard' &&
+    state.turn === HUMAN &&
+    playerStrategyIds[HUMAN] === 'human';
 
   const evaluations = useMemo(() => {
     const results: Record<PlayerId, YakuEvaluationResult> = {
@@ -426,10 +504,13 @@ export function useGame() {
       return () => window.clearTimeout(timer);
     }
 
-    if (state.phase === 'discard' && state.turn !== HUMAN) {
+    const isHumanTurn =
+      state.turn === HUMAN && playerStrategyIds[HUMAN] === 'human';
+    if (state.phase === 'discard' && !isHumanTurn) {
       const hand = state.hands[state.turn];
       if (hand.length === 0) return undefined;
-      const tileId = aiStrategy.decideDiscard(hand, state.rule);
+      const strategy = getStrategyById(playerStrategyIds[state.turn]);
+      const tileId = strategy.decideDiscard(hand, state.rule);
       if (!tileId) return undefined;
       const timer = window.setTimeout(() => {
         dispatch({ type: 'DISCARD', tileId });
@@ -438,7 +519,93 @@ export function useGame() {
     }
 
     return undefined;
-  }, [state.phase, state.turn, state.hands, state.rule, aiStrategy]);
+  }, [state.phase, state.turn, state.hands, state.rule, playerStrategyIds]);
+
+  useEffect(() => {
+    if (!evaluation.isRunning) {
+      evaluationDelayRef.current = false;
+      if (evaluationTimerRef.current !== null) {
+        window.clearTimeout(evaluationTimerRef.current);
+        evaluationTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    const phase = state.phase;
+    const lastPhase = lastPhaseRef.current;
+    lastPhaseRef.current = phase;
+
+    if (phase === 'end' && lastPhase !== 'end') {
+      if (state.winInfo) {
+        evaluationDelayRef.current = true;
+        if (evaluationTimerRef.current !== null) {
+          window.clearTimeout(evaluationTimerRef.current);
+        }
+        evaluationTimerRef.current = window.setTimeout(() => {
+          evaluationDelayRef.current = false;
+          setEvaluation((prev) => {
+            if (!prev.isRunning) return prev;
+            const wins = { ...prev.wins };
+            const totalWinPoints = { ...prev.totalWinPoints };
+            const draws = prev.draws;
+            wins[state.winInfo!.playerId] += 1;
+            totalWinPoints[state.winInfo!.playerId] += state.winInfo!.points;
+            const totalGames = prev.totalGames + 1;
+            const isRunning = totalGames < prev.targetGames;
+            const next = {
+              ...prev,
+              totalGames,
+              wins,
+              totalWinPoints,
+              draws,
+              isRunning,
+            };
+            if (next.isRunning && next.totalGames < next.targetGames) {
+              dispatch({ type: 'START_GAME', rule: next.rule });
+            }
+            return next;
+          });
+        }, 5000);
+        return () => {
+          if (evaluationTimerRef.current !== null) {
+            window.clearTimeout(evaluationTimerRef.current);
+            evaluationTimerRef.current = null;
+          }
+          evaluationDelayRef.current = false;
+        };
+      }
+      setEvaluation((prev) => {
+        if (!prev.isRunning) return prev;
+        const wins = { ...prev.wins };
+        const totalWinPoints = { ...prev.totalWinPoints };
+        let draws = prev.draws;
+        if (state.winInfo) {
+          wins[state.winInfo.playerId] += 1;
+          totalWinPoints[state.winInfo.playerId] += state.winInfo.points;
+        } else {
+          draws += 1;
+        }
+        const totalGames = prev.totalGames + 1;
+        const isRunning = totalGames < prev.targetGames;
+        return { ...prev, totalGames, wins, totalWinPoints, draws, isRunning };
+      });
+    }
+
+    if (
+      !evaluationDelayRef.current &&
+      evaluation.totalGames < evaluation.targetGames &&
+      (phase === 'idle' || phase === 'end')
+    ) {
+      dispatch({ type: 'START_GAME', rule: evaluation.rule });
+    }
+  }, [
+    evaluation.isRunning,
+    evaluation.targetGames,
+    evaluation.totalGames,
+    evaluation.rule,
+    state.phase,
+    state.winInfo,
+  ]);
 
   // setCurrentRuleIndex(i)を呼ぶことでルールをi番目に変更する
   const [currentRuleIndex, setCurrentRuleIndex] = useState(0);
@@ -451,6 +618,27 @@ export function useGame() {
    * @param tileId 切る牌のID
    */
   const discard = (tileId: string) => dispatch({ type: 'DISCARD', tileId });
+  const setEvaluationTarget = (value: number) => {
+    const normalized = Number.isFinite(value)
+      ? Math.max(1, Math.floor(value))
+      : 1;
+    setEvaluation((prev) => ({ ...prev, targetGames: normalized }));
+  };
+  const startEvaluation = () => {
+    setPlayerStrategyIds(EVALUATION_STRATEGY_IDS);
+    if (evaluationTimerRef.current !== null) {
+      window.clearTimeout(evaluationTimerRef.current);
+      evaluationTimerRef.current = null;
+    }
+    evaluationDelayRef.current = false;
+    lastPhaseRef.current = null;
+    setEvaluation((prev) => ({
+      ...INITIAL_EVALUATION,
+      targetGames: prev.targetGames,
+      rule: currentRule,
+      isRunning: true,
+    }));
+  };
 
   return {
     state,
@@ -465,7 +653,10 @@ export function useGame() {
     startGame, // ゲーム開始 startGame()
     discard, // 牌を切る discard(tileId)
     aiStrategies: AI_STRATEGIES,
-    aiStrategyId,
-    setAiStrategyId,
+    playerStrategyIds,
+    setPlayerStrategyIds,
+    evaluation,
+    setEvaluationTarget,
+    startEvaluation,
   };
 }
