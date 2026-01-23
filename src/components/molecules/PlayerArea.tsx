@@ -13,6 +13,8 @@ type PlayerAreaProps = {
   showHandFaces?: boolean;
   discardColumns?: number;
   canDiscard: boolean;
+  allowedDiscardIds?: Set<string> | string[] | null;
+  reachDiscardId?: string | null;
   onClick?: (tileId: string) => void;
   style?: CSSProperties;
 };
@@ -25,6 +27,8 @@ export default function PlayerArea({
   showHandFaces = true,
   //discardColumns = 6,
   canDiscard,
+  allowedDiscardIds,
+  reachDiscardId,
   onClick,
   style,
 }: PlayerAreaProps) {
@@ -44,6 +48,14 @@ export default function PlayerArea({
           alignItems: 'center',
         };
   const tileWrapperStyle: CSSProperties = { transformOrigin: 'center' };
+  const allowedSet =
+    allowedDiscardIds instanceof Set
+      ? allowedDiscardIds
+      : allowedDiscardIds
+        ? new Set(allowedDiscardIds)
+        : null;
+  const isTileDisabled = (tileId: string) =>
+    !canDiscard || (allowedSet ? !allowedSet.has(tileId) : false);
 
   if (direction === 'up') {
     return (
@@ -51,7 +63,11 @@ export default function PlayerArea({
         style={{ ...style, display: 'grid', gap: 8, justifyItems: 'center' }}
       >
         <div style={{ marginLeft: 'auto', marginRight: 'auto' }}>
-          <InsideWall discards={safeDiscards} direction={direction} />
+          <InsideWall
+            discards={safeDiscards}
+            direction={direction}
+            reachDiscardId={reachDiscardId}
+          />
         </div>
 
         <div style={{ display: 'flex' }}>
@@ -60,7 +76,7 @@ export default function PlayerArea({
               {safeHandTiles.slice(-handLimit).map((t) => (
                 <TileButton
                   tile={t}
-                  disabled={!canDiscard}
+                  disabled={isTileDisabled(t.id)}
                   direction={direction}
                   isHidden={!showHandFaces}
                   onClick={() => onClick?.(t.id)}
@@ -72,7 +88,7 @@ export default function PlayerArea({
             <div style={{ marginLeft: 10 }}>
               <TileButton
                 tile={tsumoTile}
-                disabled={!canDiscard}
+                disabled={isTileDisabled(tsumoTile.id)}
                 direction={direction}
                 isHidden={!showHandFaces}
                 onClick={() => onClick?.(tsumoTile.id)}
@@ -92,7 +108,7 @@ export default function PlayerArea({
             <div style={{ marginRight: 10 }}>
               <TileButton
                 tile={tsumoTile}
-                disabled={!canDiscard}
+                disabled={isTileDisabled(tsumoTile.id)}
                 direction={direction}
                 isHidden={!showHandFaces}
                 onClick={() => onClick?.(tsumoTile.id)}
@@ -104,7 +120,7 @@ export default function PlayerArea({
               {safeHandTiles.slice(-handLimit).map((t) => (
                 <TileButton
                   tile={t}
-                  disabled={!canDiscard}
+                  disabled={isTileDisabled(t.id)}
                   direction={direction}
                   isHidden={!showHandFaces}
                   onClick={() => onClick?.(t.id)}
@@ -113,7 +129,11 @@ export default function PlayerArea({
             </div>
           ) : null}
         </div>
-        <InsideWall discards={safeDiscards} direction={direction} />
+        <InsideWall
+          discards={safeDiscards}
+          direction={direction}
+          reachDiscardId={reachDiscardId}
+        />
       </div>
     );
   } else if (direction === 'left') {
@@ -123,7 +143,11 @@ export default function PlayerArea({
       >
         <div style={{ display: 'flex' }}>
           <div style={{ position: 'absolute', right: 327, top: 140 }}>
-            <InsideWall discards={safeDiscards} direction={direction} />
+            <InsideWall
+              discards={safeDiscards}
+              direction={direction}
+              reachDiscardId={reachDiscardId}
+            />
           </div>
           <div>
             {hasTsumoTile ? (
@@ -193,7 +217,11 @@ export default function PlayerArea({
             ) : null}
           </div>
           <div style={{ position: 'absolute', left: 327, top: 140 }}>
-            <InsideWall discards={safeDiscards} direction={direction} />
+            <InsideWall
+              discards={safeDiscards}
+              direction={direction}
+              reachDiscardId={reachDiscardId}
+            />
           </div>
         </div>
       </div>

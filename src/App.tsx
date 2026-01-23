@@ -12,6 +12,9 @@ export default function App() {
     currentRule,
     canStart,
     canDiscard,
+    canReach,
+    declareReach,
+    allowedDiscardIds,
     rules,
     currentRuleIndex,
     setCurrentRuleIndex,
@@ -49,7 +52,11 @@ export default function App() {
           state={state}
           humanId={HUMAN}
           canDiscard={canDiscard}
+          canReach={canReach}
+          allowedDiscardIds={allowedDiscardIds}
+          onReach={declareReach}
           onDiscard={discard}
+          onNextHand={startGame}
         />
         <RulesPanel rule={currentRule} />
         <LogPanel

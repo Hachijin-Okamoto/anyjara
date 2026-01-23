@@ -3,12 +3,14 @@ import { type PlayerId } from '@/hooks/useGame';
 type TableCenterProps = {
   wallCount: number;
   turn: PlayerId;
+  dealer: PlayerId;
   scores: Record<PlayerId, number>;
 };
 
 export default function TableCenter({
   wallCount,
   turn,
+  dealer,
   scores,
 }: TableCenterProps) {
   return (
@@ -31,7 +33,7 @@ export default function TableCenter({
         <div
           style={{
             transform: 'rotate(180deg)',
-            color: turn === 2 ? '#d64545' : '#555',
+            color: dealer === 2 ? '#d64545' : '#555',
             whiteSpace: 'nowrap',
           }}
         >
@@ -50,7 +52,7 @@ export default function TableCenter({
         </div>
         <div
           style={{
-            color: turn === 0 ? '#d64545' : '#555',
+            color: dealer === 0 ? '#d64545' : '#555',
             whiteSpace: 'nowrap',
             position: 'absolute',
             bottom: 0,
@@ -68,7 +70,7 @@ export default function TableCenter({
           right: 0,
           top: '50%',
           transform: 'translateY(-50%) rotate(270deg)',
-          color: turn === 3 ? '#d64545' : '#555',
+          color: dealer === 3 ? '#d64545' : '#555',
           whiteSpace: 'nowrap',
         }}
       >
@@ -80,7 +82,7 @@ export default function TableCenter({
           left: 0,
           top: '50%',
           transform: 'translateY(-50%) rotate(90deg)',
-          color: turn === 1 ? '#d64545' : '#555',
+          color: dealer === 1 ? '#d64545' : '#555',
           whiteSpace: 'nowrap',
         }}
       >

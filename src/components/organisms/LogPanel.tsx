@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import ActionButton from '@/components/atoms/ActionButton';
 import { type EvaluationState, type PlayerId } from '@/hooks/useGame';
 
@@ -14,46 +16,69 @@ export default function LogPanel({
   onSetEvaluationTarget,
   onStartEvaluation,
 }: LogPanelProps) {
+  const [showLog, setShowLog] = useState(true);
   const playerIds: PlayerId[] = [0, 1, 2, 3];
   const totalGames = evaluation.totalGames;
   const progressText = evaluation.isRunning
-    ? `実行中: ${totalGames}/${evaluation.targetGames}`
-    : `結果: ${totalGames}/${evaluation.targetGames}`;
+    ? `実行中: ${totalGames}/${evaluation.targetGames} セット`
+    : `結果: ${totalGames}/${evaluation.targetGames} セット`;
 
   return (
-    <section
-      style={{
-        border: '1px solid #eee',
-        borderRadius: 16,
-        padding: 14,
-        background: 'white',
-      }}
-    >
-      <h2 style={{ margin: '0 0 10px 0' }}>Log</h2>
-      <div
+    <div style={{ display: 'grid', gap: 16 }}>
+      <section
         style={{
-          maxHeight: 220,
-          overflow: 'auto',
-          border: '1px solid #f0f0f0',
-          borderRadius: 12,
-          padding: 10,
-          background: '#fafafa',
-          whiteSpace: 'pre-wrap',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 13,
+          border: '1px solid #eee',
+          borderRadius: 16,
+          padding: 14,
+          background: 'white',
         }}
       >
-        {log.slice(-50).join('\n')}
-      </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 10,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Log</h2>
+          <ActionButton onClick={() => setShowLog((prev) => !prev)}>
+            {showLog ? 'ログを非表示' : 'ログを表示'}
+          </ActionButton>
+        </div>
+        {showLog ? (
+          <div
+            style={{
+              maxHeight: 220,
+              overflow: 'auto',
+              border: '1px solid #f0f0f0',
+              borderRadius: 12,
+              padding: 10,
+              background: '#fafafa',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: 13,
+            }}
+          >
+            {log.slice(-50).join('\n')}
+          </div>
+        ) : (
+          <div style={{ color: '#777', fontSize: 13 }}>
+            ログは非表示中です。
+          </div>
+        )}
+      </section>
 
-      <div
+      <section
         style={{
-          marginTop: 16,
-          paddingTop: 12,
-          borderTop: '1px dashed #eee',
+          border: '1px solid #eee',
+          borderRadius: 16,
+          padding: 14,
+          background: 'white',
         }}
       >
-        <h3 style={{ margin: '0 0 10px 0' }}>課題評価</h3>
+        <h2 style={{ margin: '0 0 10px 0' }}>課題評価</h2>
         <div
           style={{
             display: 'flex',
@@ -93,7 +118,7 @@ export default function LogPanel({
         </div>
         <div style={{ color: '#444', marginBottom: 10 }}>{progressText}</div>
         <div style={{ color: '#666', marginBottom: 12 }}>
-          引き分け: {evaluation.draws}
+          流局回数: {evaluation.draws}
         </div>
         <div
           style={{
@@ -103,10 +128,19 @@ export default function LogPanel({
           }}
         >
           {playerIds.map((playerId) => {
-            const wins = evaluation.wins[playerId];
-            const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
-            const avgPoints =
-              wins > 0 ? evaluation.totalWinPoints[playerId] / wins : 0;
+            const ranks = evaluation.rankCounts[playerId];
+            const firstRate =
+              totalGames > 0 ? (ranks.first / totalGames) * 100 : 0;
+            const secondRate =
+              totalGames > 0 ? (ranks.second / totalGames) * 100 : 0;
+            const thirdRate =
+              totalGames > 0 ? (ranks.third / totalGames) * 100 : 0;
+            const fourthRate =
+              totalGames > 0 ? (ranks.fourth / totalGames) * 100 : 0;
+            const avgFinalScore =
+              totalGames > 0
+                ? evaluation.totalFinalScores[playerId] / totalGames
+                : 0;
             return (
               <div
                 key={`eval-player-${playerId}`}
@@ -120,14 +154,16 @@ export default function LogPanel({
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
                   P{playerId}
                 </div>
-                <div>勝率: {winRate.toFixed(1)}%</div>
-                <div>平均点: {avgPoints.toFixed(1)}</div>
-                <div>勝利数: {wins}</div>
+                <div>1位率: {firstRate.toFixed(1)}%</div>
+                <div>2位率: {secondRate.toFixed(1)}%</div>
+                <div>3位率: {thirdRate.toFixed(1)}%</div>
+                <div>4位率: {fourthRate.toFixed(1)}%</div>
+                <div>平均最終点: {avgFinalScore.toFixed(1)}</div>
               </div>
             );
           })}
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

@@ -10,13 +10,21 @@ type TableBoardProps = {
   state: GameState;
   humanId: PlayerId;
   canDiscard: boolean;
+  canReach: boolean;
+  allowedDiscardIds: Set<string> | null;
+  onReach: () => void;
   onDiscard: (tileId: string) => void;
+  onNextHand: () => void;
 };
 
 export default function TableBoard({
   state,
   canDiscard,
+  canReach,
+  allowedDiscardIds,
+  onReach,
   onDiscard,
+  onNextHand,
 }: TableBoardProps) {
   const [showOpponentHands, setShowOpponentHands] = useState(false);
 
@@ -37,8 +45,12 @@ export default function TableBoard({
     return { lastTsumoId, hand, tsumoTile, baseHand };
   });
 
-  const scores = { 0: 0, 1: 0, 2: 0, 3: 0 } as const;
+  const scores = state.score;
   const winInfo = state.winInfo;
+  const drawInfo = state.drawInfo;
+  const showResult = winInfo || drawInfo;
+  const reachPlayer = state.lastReach;
+  const hasReach = reachPlayer !== null;
 
   return (
     <section
@@ -81,7 +93,36 @@ export default function TableBoard({
           overflow: 'hidden',
         }}
       >
-        {winInfo && (
+        {hasReach && (
+          <div
+            style={{
+              position: 'absolute',
+              insetInline: 0,
+              top: 24,
+              display: 'flex',
+              justifyContent: 'center',
+              zIndex: 4,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                padding: '10px 26px',
+                borderRadius: 999,
+                background:
+                  'linear-gradient(90deg, rgba(220,40,40,0.9), rgba(255,140,50,0.9))',
+                color: 'white',
+                fontWeight: 800,
+                letterSpacing: 1.5,
+                boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
+                transform: 'skewX(-8deg)',
+              }}
+            >
+              P{reachPlayer} リーチ
+            </div>
+          </div>
+        )}
+        {showResult && (
           <div
             style={{
               position: 'absolute',
@@ -102,50 +143,76 @@ export default function TableBoard({
                 boxShadow: '0 16px 40px rgba(0,0,0,0.12)',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                  marginBottom: 12,
-                }}
-              >
-                <div
-                  style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}
-                >
-                  <span style={{ fontSize: 22, fontWeight: 700 }}>
-                    P{winInfo.playerId} 勝利
-                  </span>
-                  <span style={{ color: '#666' }}>
-                    {winInfo.winType === 'ron' ? 'ロン' : 'ツモ'}
-                  </span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>
-                  得点 {winInfo.points}
-                </div>
-              </div>
-              <div style={{ marginBottom: 12, color: '#444' }}>
-                役:{' '}
-                {winInfo.yakuNames.length > 0
-                  ? winInfo.yakuNames.join(' / ')
-                  : 'なし'}
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  background: '#f7f7f7',
-                  border: '1px solid #eee',
-                }}
-              >
-                {winInfo.hand.map((tile) => (
-                  <TileButton key={tile.id} tile={tile} disabled scale={0.9} />
-                ))}
+              {winInfo ? (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div
+                      style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}
+                    >
+                      <span style={{ fontSize: 22, fontWeight: 700 }}>
+                        P{winInfo.playerId} 勝利
+                      </span>
+                      <span style={{ color: '#666' }}>
+                        {winInfo.winType === 'ron' ? 'ロン' : 'ツモ'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>
+                      得点 {winInfo.points}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12, color: '#444' }}>
+                    役:{' '}
+                    {winInfo.yakuNames.length > 0
+                      ? winInfo.yakuNames.join(' / ')
+                      : 'なし'}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      padding: 12,
+                      borderRadius: 12,
+                      background: '#f7f7f7',
+                      border: '1px solid #eee',
+                    }}
+                  >
+                    {winInfo.hand.map((tile) => (
+                      <TileButton key={tile.id} tile={tile} disabled scale={0.9} />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <span style={{ fontSize: 22, fontWeight: 700 }}>流局</span>
+                    <span style={{ color: '#666' }}>上がりなし</span>
+                  </div>
+                  <div style={{ marginBottom: 12, color: '#444' }}>
+                    {state.setOver ? '親が2周したためセット終了。' : '次ゲームへ。'}
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                <ActionButton onClick={onNextHand}>OK</ActionButton>
               </div>
             </div>
           </div>
@@ -159,6 +226,7 @@ export default function TableBoard({
             direction="right"
             showHandFaces={showOpponentHands}
             canDiscard={false}
+            reachDiscardId={state.reachDiscardIds[1]}
           />
         </div>
         <div style={{ position: 'absolute', right: 0, top: 140 }}>
@@ -170,6 +238,7 @@ export default function TableBoard({
             direction="left"
             showHandFaces={showOpponentHands}
             canDiscard={false}
+            reachDiscardId={state.reachDiscardIds[3]}
           />
         </div>
         <div style={{ display: 'grid' }}>
@@ -181,6 +250,7 @@ export default function TableBoard({
             direction="down"
             showHandFaces={showOpponentHands}
             canDiscard={false}
+            reachDiscardId={state.reachDiscardIds[2]}
           />
           <div
             style={{
@@ -194,6 +264,7 @@ export default function TableBoard({
             <TableCenter
               wallCount={state.wall.length}
               turn={state.turn}
+              dealer={state.dealer}
               scores={scores}
             />
           </div>
@@ -204,8 +275,22 @@ export default function TableBoard({
             tsumoTile={handResults[0].tsumoTile}
             direction="up"
             canDiscard={canDiscard}
+            allowedDiscardIds={allowedDiscardIds}
+            reachDiscardId={state.reachDiscardIds[0]}
             onClick={onDiscard}
           />
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 10,
+              marginTop: 10,
+            }}
+          >
+            <ActionButton onClick={onReach} disabled={!canReach}>
+              リーチ
+            </ActionButton>
+          </div>
         </div>
       </div>
     </section>
