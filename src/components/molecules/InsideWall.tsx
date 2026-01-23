@@ -8,6 +8,7 @@ type InsideWallProps = {
   direction: 'up' | 'down' | 'left' | 'right';
   turnLimit?: number;
   horizontalStyle?: CSSProperties;
+  reachDiscardId?: string | null;
 };
 
 export default function InsideWall({
@@ -15,6 +16,7 @@ export default function InsideWall({
   direction,
   turnLimit = 5,
   horizontalStyle,
+  reachDiscardId,
 }: InsideWallProps) {
   const hasDiscards = discards !== undefined;
   const safeDiscards = discards ?? [];
@@ -63,7 +65,13 @@ export default function InsideWall({
       {rows.map((row, rowIndex) => (
         <div key={`discard-row-${rowIndex}`} style={rowStyle}>
           {row.map((tile) => (
-            <TileButton tile={tile} disabled direction={'up'} scale={0.75} />
+            <TileButton
+              key={tile.id}
+              tile={tile}
+              disabled
+              direction={tile.id === reachDiscardId ? 'left' : 'up'}
+              scale={0.75}
+            />
           ))}
         </div>
       ))}
