@@ -19,10 +19,16 @@ export type EvaluationState = {
   targetGames: number;
   totalGames: number;
   draws: number;
-  rankCounts: Record<PlayerId, { first: number; second: number; third: number; fourth: number }>;
+  speedMode: EvaluationSpeedMode;
+  rankCounts: Record<
+    PlayerId,
+    { first: number; second: number; third: number; fourth: number }
+  >;
   totalFinalScores: Record<PlayerId, number>;
   rule: RuleDefinition;
 };
+
+export type EvaluationSpeedMode = 'normal' | 'fast-cpu' | 'instant';
 
 export type GameState = {
   wall: Tile[];
@@ -74,13 +80,6 @@ const PLAYER_STRATEGIES_DEFAULT: Record<PlayerId, string> = {
   3: 'yaku-progress',
 };
 
-const EVALUATION_STRATEGY_IDS: Record<PlayerId, string> = {
-  0: 'yaku-progress',
-  1: 'random',
-  2: 'random',
-  3: 'random',
-};
-
 const NON_HUMAN_STRATEGIES = AI_STRATEGIES.filter(
   (strategy) => strategy.id !== 'human',
 );
@@ -91,6 +90,7 @@ const INITIAL_EVALUATION: EvaluationState = {
   targetGames: 100,
   totalGames: 0,
   draws: 0,
+  speedMode: 'normal',
   rankCounts: {
     0: { first: 0, second: 0, third: 0, fourth: 0 },
     1: { first: 0, second: 0, third: 0, fourth: 0 },
@@ -719,7 +719,34 @@ export function useGame() {
     useState<EvaluationState>(INITIAL_EVALUATION);
   const lastPhaseRef = useRef<Phase | null>(null);
   const autoAdvanceTimerRef = useRef<number | null>(null);
-  const autoAdvanceDelayMs = 1600;
+
+  const evaluationTiming = useMemo(() => {
+    if (!evaluation.isRunning) {
+      return {
+        drawDelayMs: 300,
+        autoReachDelayMs: 300,
+        cpuDiscardDelayMs: 500,
+        autoAdvanceDelayMs: 1600,
+      };
+    }
+    switch (evaluation.speedMode) {
+      case 'fast-cpu':
+      case 'instant':
+        return {
+          drawDelayMs: 0,
+          autoReachDelayMs: 0,
+          cpuDiscardDelayMs: 0,
+          autoAdvanceDelayMs: 0,
+        };
+      default:
+        return {
+          drawDelayMs: 300,
+          autoReachDelayMs: 300,
+          cpuDiscardDelayMs: 500,
+          autoAdvanceDelayMs: 1600,
+        };
+    }
+  }, [evaluation.isRunning, evaluation.speedMode]);
 
   const canStart = state.phase === 'idle' || state.phase === 'end';
   const canDiscard =
@@ -757,7 +784,9 @@ export function useGame() {
   const allowedDiscardIds = useMemo(() => {
     if (!canDiscard) return null;
     if (state.isReached[HUMAN]) {
-      return state.lastTsumo[HUMAN] ? new Set([state.lastTsumo[HUMAN]]) : new Set<string>();
+      return state.lastTsumo[HUMAN]
+        ? new Set([state.lastTsumo[HUMAN]])
+        : new Set<string>();
     }
     if (state.reachPending[HUMAN]) {
       return new Set(reachDiscardIds);
@@ -776,9 +805,13 @@ export function useGame() {
     if (state.phase === 'idle' || state.phase === 'end') return undefined;
 
     if (state.phase === 'draw') {
+      if (evaluationTiming.drawDelayMs <= 0) {
+        dispatch({ type: 'DRAW' });
+        return undefined;
+      }
       const timer = window.setTimeout(() => {
         dispatch({ type: 'DRAW' });
-      }, 300);
+      }, evaluationTiming.drawDelayMs);
       return () => window.clearTimeout(timer);
     }
 
@@ -790,9 +823,13 @@ export function useGame() {
       if (!state.isReached[state.turn] && !state.reachPending[state.turn]) {
         const canAutoReach = getReachDiscardIds(hand, state.rule).length > 0;
         if (canAutoReach) {
+          if (evaluationTiming.autoReachDelayMs <= 0) {
+            dispatch({ type: 'DECLARE_REACH' });
+            return undefined;
+          }
           const timer = window.setTimeout(() => {
             dispatch({ type: 'DECLARE_REACH' });
-          }, 300);
+          }, evaluationTiming.autoReachDelayMs);
           return () => window.clearTimeout(timer);
         }
       }
@@ -804,12 +841,20 @@ export function useGame() {
         const reachDiscardIds = getReachDiscardIds(hand, state.rule);
         tileId = reachDiscardIds[0];
       } else {
-        tileId = strategy.decideDiscard(hand, state.rule);
+        tileId = strategy.decideDiscard(hand, state.rule, {
+          discards: state.discards,
+          lastReach: state.lastReach,
+          isReached: state.isReached,
+        });
       }
       if (!tileId) return undefined;
+      if (evaluationTiming.cpuDiscardDelayMs <= 0) {
+        dispatch({ type: 'DISCARD', tileId });
+        return undefined;
+      }
       const timer = window.setTimeout(() => {
         dispatch({ type: 'DISCARD', tileId });
-      }, 500);
+      }, evaluationTiming.cpuDiscardDelayMs);
       return () => window.clearTimeout(timer);
     }
 
@@ -823,6 +868,7 @@ export function useGame() {
     state.reachPending,
     state.lastTsumo,
     playerStrategyIds,
+    evaluationTiming,
   ]);
 
   useEffect(() => {
@@ -886,10 +932,14 @@ export function useGame() {
           autoAdvanceTimerRef.current = null;
         }
         if (phase === 'end') {
-          autoAdvanceTimerRef.current = window.setTimeout(() => {
-            autoAdvanceTimerRef.current = null;
+          if (evaluationTiming.autoAdvanceDelayMs <= 0) {
             dispatch({ type: 'START_GAME', rule: evaluation.rule });
-          }, autoAdvanceDelayMs);
+          } else {
+            autoAdvanceTimerRef.current = window.setTimeout(() => {
+              autoAdvanceTimerRef.current = null;
+              dispatch({ type: 'START_GAME', rule: evaluation.rule });
+            }, evaluationTiming.autoAdvanceDelayMs);
+          }
         } else {
           dispatch({ type: 'START_GAME', rule: evaluation.rule });
         }
@@ -911,6 +961,7 @@ export function useGame() {
     state.drawInfo,
     state.setOver,
     state.score,
+    evaluationTiming,
   ]);
 
   // setCurrentRuleIndex(i)を呼ぶことでルールをi番目に変更する
@@ -931,12 +982,15 @@ export function useGame() {
       : 1;
     setEvaluation((prev) => ({ ...prev, targetGames: normalized }));
   };
+  const setEvaluationSpeed = (mode: EvaluationSpeedMode) => {
+    setEvaluation((prev) => ({ ...prev, speedMode: mode }));
+  };
   const startEvaluation = () => {
-    setPlayerStrategyIds(EVALUATION_STRATEGY_IDS);
     lastPhaseRef.current = null;
     setEvaluation((prev) => ({
       ...INITIAL_EVALUATION,
       targetGames: prev.targetGames,
+      speedMode: prev.speedMode,
       rule: currentRule,
       isRunning: true,
     }));
@@ -962,6 +1016,7 @@ export function useGame() {
     setPlayerStrategyIds,
     evaluation,
     setEvaluationTarget,
+    setEvaluationSpeed,
     startEvaluation,
   };
 }

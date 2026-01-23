@@ -25,8 +25,11 @@ export default function App() {
     setPlayerStrategyIds,
     evaluation,
     setEvaluationTarget,
+    setEvaluationSpeed,
     startEvaluation,
   } = useGame();
+  const isHeadlessEvaluation =
+    evaluation.isRunning && evaluation.speedMode === 'instant';
 
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui, sans-serif' }}>
@@ -48,21 +51,42 @@ export default function App() {
       />
 
       <GameSectionGrid>
-        <TableBoard
-          state={state}
-          humanId={HUMAN}
-          canDiscard={canDiscard}
-          canReach={canReach}
-          allowedDiscardIds={allowedDiscardIds}
-          onReach={declareReach}
-          onDiscard={discard}
-          onNextHand={startGame}
-        />
+        {isHeadlessEvaluation ? (
+          <section
+            style={{
+              border: '1px solid #eee',
+              borderRadius: 16,
+              padding: 14,
+              background: 'white',
+              maxWidth: 1200,
+              margin: '0 auto',
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <h2 style={{ margin: 0 }}>Table</h2>
+            <p style={{ margin: 0, color: '#666' }}>
+              演出なしで評価中のため、牌の表示を省略しています。
+            </p>
+          </section>
+        ) : (
+          <TableBoard
+            state={state}
+            humanId={HUMAN}
+            canDiscard={canDiscard}
+            canReach={canReach}
+            allowedDiscardIds={allowedDiscardIds}
+            onReach={declareReach}
+            onDiscard={discard}
+            onNextHand={startGame}
+          />
+        )}
         <RulesPanel rule={currentRule} />
         <LogPanel
           log={state.log}
           evaluation={evaluation}
           onSetEvaluationTarget={setEvaluationTarget}
+          onSetEvaluationSpeed={setEvaluationSpeed}
           onStartEvaluation={startEvaluation}
         />
       </GameSectionGrid>

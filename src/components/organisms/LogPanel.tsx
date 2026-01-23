@@ -1,12 +1,17 @@
 import { useState } from 'react';
 
 import ActionButton from '@/components/atoms/ActionButton';
-import { type EvaluationState, type PlayerId } from '@/hooks/useGame';
+import {
+  type EvaluationSpeedMode,
+  type EvaluationState,
+  type PlayerId,
+} from '@/hooks/useGame';
 
 type LogPanelProps = {
   log: string[];
   evaluation: EvaluationState;
   onSetEvaluationTarget: (value: number) => void;
+  onSetEvaluationSpeed: (mode: EvaluationSpeedMode) => void;
   onStartEvaluation: () => void;
 };
 
@@ -14,6 +19,7 @@ export default function LogPanel({
   log,
   evaluation,
   onSetEvaluationTarget,
+  onSetEvaluationSpeed,
   onStartEvaluation,
 }: LogPanelProps) {
   const [showLog, setShowLog] = useState(true);
@@ -113,8 +119,52 @@ export default function LogPanel({
             連続実行
           </ActionButton>
           <span style={{ color: '#666', fontSize: 13 }}>
-            P0: 役優先 / P1-3: ランダム
+            現在の設定で評価します
           </span>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            alignItems: 'center',
+            marginBottom: 10,
+          }}
+        >
+          <span style={{ color: '#444', fontWeight: 600 }}>速度</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="radio"
+              name="evaluation-speed"
+              value="normal"
+              checked={evaluation.speedMode === 'normal'}
+              disabled={evaluation.isRunning}
+              onChange={() => onSetEvaluationSpeed('normal')}
+            />
+            今まで通り
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="radio"
+              name="evaluation-speed"
+              value="fast-cpu"
+              checked={evaluation.speedMode === 'fast-cpu'}
+              disabled={evaluation.isRunning}
+              onChange={() => onSetEvaluationSpeed('fast-cpu')}
+            />
+            CPU高速
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="radio"
+              name="evaluation-speed"
+              value="instant"
+              checked={evaluation.speedMode === 'instant'}
+              disabled={evaluation.isRunning}
+              onChange={() => onSetEvaluationSpeed('instant')}
+            />
+            演出なし
+          </label>
         </div>
         <div style={{ color: '#444', marginBottom: 10 }}>{progressText}</div>
         <div style={{ color: '#666', marginBottom: 12 }}>

@@ -51,6 +51,18 @@ export default function TableBoard({
   const showResult = winInfo || drawInfo;
   const reachPlayer = state.lastReach;
   const hasReach = reachPlayer !== null;
+  const rankings = [...([0, 1, 2, 3] as const)].sort((a, b) => {
+    const diff = scores[b] - scores[a];
+    if (diff !== 0) return diff;
+    return a - b;
+  });
+  const rankMap = rankings.reduce<Record<number, number>>(
+    (acc, playerId, index) => {
+      acc[playerId] = index + 1;
+      return acc;
+    },
+    {},
+  );
 
   return (
     <section
@@ -156,7 +168,11 @@ export default function TableBoard({
                     }}
                   >
                     <div
-                      style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'baseline',
+                      }}
                     >
                       <span style={{ fontSize: 22, fontWeight: 700 }}>
                         P{winInfo.playerId} 勝利
@@ -187,7 +203,12 @@ export default function TableBoard({
                     }}
                   >
                     {winInfo.hand.map((tile) => (
-                      <TileButton key={tile.id} tile={tile} disabled scale={0.9} />
+                      <TileButton
+                        key={tile.id}
+                        tile={tile}
+                        disabled
+                        scale={0.9}
+                      />
                     ))}
                   </div>
                 </>
@@ -207,11 +228,61 @@ export default function TableBoard({
                     <span style={{ color: '#666' }}>上がりなし</span>
                   </div>
                   <div style={{ marginBottom: 12, color: '#444' }}>
-                    {state.setOver ? '親が2周したためセット終了。' : '次ゲームへ。'}
+                    {state.setOver
+                      ? '親が2周したためセット終了。'
+                      : '次ゲームへ。'}
                   </div>
                 </>
               )}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+              {state.setOver && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: 12,
+                    borderRadius: 12,
+                    background: '#f7f7f7',
+                    border: '1px solid #eee',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                    セット結果
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: 8,
+                    }}
+                  >
+                    {([0, 1, 2, 3] as const).map((playerId) => (
+                      <div
+                        key={`set-result-${playerId}`}
+                        style={{
+                          padding: 8,
+                          borderRadius: 10,
+                          background: 'white',
+                          border: '1px solid #eaeaea',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>
+                          P{playerId}：{rankMap[playerId]}位
+                        </div>
+                        <div style={{ color: '#444' }}>
+                          持ち点 {scores[playerId]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  marginTop: 14,
+                }}
+              >
                 <ActionButton onClick={onNextHand}>OK</ActionButton>
               </div>
             </div>
